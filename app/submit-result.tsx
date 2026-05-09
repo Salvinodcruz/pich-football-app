@@ -30,6 +30,9 @@ export default function SubmitResultScreen() {
   const [myPlayers, setMyPlayers] = useState<any[]>([]);
   const [playerGoals, setPlayerGoals] = useState<Record<string, number>>({});
   const [playerAssists, setPlayerAssists] = useState<Record<string, number>>({});
+  const [playerIsGK, setPlayerIsGK] = useState<Record<string, boolean>>({});
+  const [playerSaves, setPlayerSaves] = useState<Record<string, number>>({});
+  const [playerCleanSheets, setPlayerCleanSheets] = useState<Record<string, boolean>>({});
   const [myTeamId, setMyTeamId] = useState('');
   const [matchData, setMatchData] = useState<any>(null);
   const [dialog, setDialog] = useState<{
@@ -100,8 +103,11 @@ const handleSubmit = async () => {
       const playerStatsSubmission = myPlayers.map(p => ({
         playerId: p.id,
         playerName: `${p.firstName || ''} ${p.lastName || ''}`.trim() || p.name || 'Player',
-        goals: playerGoals[p.id] || 0,
+        goals: playerIsGK[p.id] ? 0 : (playerGoals[p.id] || 0),
         assists: playerAssists[p.id] || 0,
+        isGK: playerIsGK[p.id] || false,
+        saves: playerIsGK[p.id] ? (playerSaves[p.id] || 0) : 0,
+        cleanSheet: playerIsGK[p.id] ? (playerCleanSheets[p.id] || false) : false,
         photoURL: p.photoURL || null,
       }));
 
@@ -183,15 +189,22 @@ const handleSubmit = async () => {
 
   const updatePlayerStats = async (stats: any[]) => {
     for (const stat of stats) {
-      if (stat.goals === 0 && stat.assists === 0) continue;
+      if (stat.goals === 0 && stat.assists === 0 && (!stat.isGK || (stat.saves === 0 && !stat.cleanSheet))) continue;
       try {
         const pDoc = await getDoc(doc(db, 'users', stat.playerId));
         if (pDoc.exists()) {
           const pData = pDoc.data();
-          await updateDoc(doc(db, 'users', stat.playerId), {
+          const updates: any = {
             goals: (pData.goals || 0) + stat.goals,
             assists: (pData.assists || 0) + stat.assists,
-          });
+          };
+          if (stat.isGK) {
+            updates.totalSaves = (pData.totalSaves || 0) + (stat.saves || 0);
+            if (stat.cleanSheet) {
+              updates.totalCleanSheets = (pData.totalCleanSheets || 0) + 1;
+            }
+          }
+          await updateDoc(doc(db, 'users', stat.playerId), updates);
         }
       } catch (e) {
         console.error('Player stat update error:', e);
@@ -339,8 +352,11 @@ const handleSubmit = async () => {
             )}
 
             {myPlayers.map(player => {
+              const isGK = playerIsGK[player.id] || false;
               const goals = playerGoals[player.id] || 0;
               const assists = playerAssists[player.id] || 0;
+              const saves = playerSaves[player.id] || 0;
+              const cleanSheet = playerCleanSheets[player.id] || false;
               const name = player.firstName
                 ? `${player.firstName} ${player.lastName || ''}`.trim()
                 : player.name || 'Player';
@@ -362,26 +378,67 @@ const handleSubmit = async () => {
                   {/* Name */}
                   <View style={styles.playerInfo}>
                     <Text style={styles.playerName} numberOfLines={1}>{name}</Text>
-                    <Text style={styles.playerPosition}>{player.teamPosition || player.position || '?'}</Text>
+                    <TouchableOpacity 
+                      style={[styles.gkChip, isGK && styles.gkChipActive]}
+                      onPress={() => setPlayerIsGK(prev => ({ ...prev, [player.id]: !isGK }))}
+                    >
+                      <Text style={[styles.gkChipText, isGK && styles.gkChipTextActive]}>GK</Text>
+                    </TouchableOpacity>
                   </View>
 
-                  {/* Goals */}
-                  <View style={styles.statControl}>
-                    <Ionicons name="football-outline" size={14} color="#aaa" />
-                    <TouchableOpacity
-                      style={styles.statBtn}
-                      onPress={() => setPlayerGoals(prev => ({ ...prev, [player.id]: Math.max(0, (prev[player.id] || 0) - 1) }))}
-                    >
-                      <Text style={styles.statBtnText}>−</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.statValue}>{goals}</Text>
-                    <TouchableOpacity
-                      style={styles.statBtn}
-                      onPress={() => setPlayerGoals(prev => ({ ...prev, [player.id]: (prev[player.id] || 0) + 1 }))}
-                    >
-                      <Text style={styles.statBtnText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
+                  {!isGK ? (
+                    <>
+                      {/* Goals */}
+                      <View style={styles.statControl}>
+                        <Ionicons name="football-outline" size={14} color="#aaa" />
+                        <TouchableOpacity
+                          style={styles.statBtn}
+                          onPress={() => setPlayerGoals(prev => ({ ...prev, [player.id]: Math.max(0, (prev[player.id] || 0) - 1) }))}
+                        >
+                          <Text style={styles.statBtnText}>−</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.statValue}>{goals}</Text>
+                        <TouchableOpacity
+                          style={styles.statBtn}
+                          onPress={() => setPlayerGoals(prev => ({ ...prev, [player.id]: (prev[player.id] || 0) + 1 }))}
+                        >
+                          <Text style={styles.statBtnText}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      {/* Saves */}
+                      <View style={styles.statControl}>
+                        <MaterialCommunityIcons name="hand-front-right-outline" size={14} color={Colors.dark.tint} />
+                        <TouchableOpacity
+                          style={styles.statBtn}
+                          onPress={() => setPlayerSaves(prev => ({ ...prev, [player.id]: Math.max(0, (prev[player.id] || 0) - 1) }))}
+                        >
+                          <Text style={styles.statBtnText}>−</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.statValue}>{saves}</Text>
+                        <TouchableOpacity
+                          style={styles.statBtn}
+                          onPress={() => setPlayerSaves(prev => ({ ...prev, [player.id]: (prev[player.id] || 0) + 1 }))}
+                        >
+                          <Text style={styles.statBtnText}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Clean Sheet */}
+                      <TouchableOpacity 
+                        style={[styles.csBtn, cleanSheet && styles.csBtnActive]}
+                        onPress={() => setPlayerCleanSheets(prev => ({ ...prev, [player.id]: !cleanSheet }))}
+                      >
+                        <MaterialCommunityIcons 
+                          name={cleanSheet ? "shield-check" : "shield-check-outline"} 
+                          size={18} 
+                          color={cleanSheet ? Colors.dark.tint : "#666"} 
+                        />
+                      </TouchableOpacity>
+                    </>
+                  )}
 
                   {/* Assists */}
                   <View style={styles.statControl}>
@@ -501,6 +558,12 @@ const styles = StyleSheet.create({
   playerAvatarText: { color: Colors.dark.text, fontSize: FontSizes.xs, fontWeight: FontWeights.bold },
   playerInfo: { flex: 1, minWidth: 0 },
   playerName: { color: '#fff', fontSize: FontSizes.xs, fontWeight: FontWeights.semibold },
+  gkChip: { backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start', marginTop: 2, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  gkChipActive: { backgroundColor: Colors.dark.tint + '20', borderColor: Colors.dark.tint },
+  gkChipText: { color: '#666', fontSize: 8, fontWeight: 'bold' },
+  gkChipTextActive: { color: Colors.dark.tint },
+  csBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  csBtnActive: { backgroundColor: Colors.dark.tint + '10', borderColor: Colors.dark.tint + '40' },
   playerPosition: { color: '#666', fontSize: 10 },
   statControl: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   statLabel: { fontSize: 12 },

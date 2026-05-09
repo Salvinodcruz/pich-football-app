@@ -10,13 +10,13 @@ import { signOut } from 'firebase/auth';
 import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import { updatePlayerRating } from '@/src/utils/ratingService';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import SkillHexagon from '@/src/components/SkillHexagon';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const POSITIONS = ['GK', 'DEF', 'MID', 'FWD'];
 const EMIRATES = ['Sharjah', 'Dubai', 'Ajman'];
@@ -54,47 +54,38 @@ export default function ProfileScreen() {
   };
 
   useEffect(() => {
-    loadProfile();
+    let unsubscribe: () => void;
     const user = auth.currentUser;
     if (user) {
-      updatePlayerRating(user.uid).then(() => loadProfile());
+      updatePlayerRating(user.uid).then(() => {
+        unsubscribe = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            setProfile(data);
+            setIsFreeAgent(data.isFreeAgent || false);
+            setEditFirstName(data.firstName || '');
+            setEditMiddleName(data.middleName || '');
+            setEditLastName(data.lastName || '');
+            setEditPosition(data.position || '');
+            setEditEmirate(data.emirate || '');
+            const dobParts = data.dob?.split(' ') || [];
+            setEditDobDay(dobParts[0] || '');
+            setEditDobMonth(dobParts[1] || '');
+            setEditDobYear(dobParts[2] || '');
+          }
+          setLoading(false);
+        });
+      });
+    } else {
+      setLoading(false);
     }
+    return () => unsubscribe?.();
   }, []);
 
   useFocusEffect(useCallback(() => { loadUnreadCount(); }, []));
 
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: showDropdown ? 1 : 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start();
-  }, [showDropdown]);
-
   const loadProfile = async () => {
-    try {
-      const user = auth.currentUser;
-      if (!user) return;
-      const docSnap = await getDoc(doc(db, 'users', user.uid));
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setProfile(data);
-        setIsFreeAgent(data.isFreeAgent || false);
-        setEditFirstName(data.firstName || '');
-        setEditMiddleName(data.middleName || '');
-        setEditLastName(data.lastName || '');
-        setEditPosition(data.position || '');
-        setEditEmirate(data.emirate || '');
-        const dobParts = data.dob?.split(' ') || [];
-        setEditDobDay(dobParts[0] || '');
-        setEditDobMonth(dobParts[1] || '');
-        setEditDobYear(dobParts[2] || '');
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    // legacy function replaced by onSnapshot
   };
 
   const loadUnreadCount = async () => {
@@ -315,17 +306,39 @@ export default function ProfileScreen() {
 
         {/* ── Stats Row ── */}
         <View style={styles.statsRow}>
-          {[
-            { label: 'Matches', value: profile?.matches || 0, icon: 'calendar-outline' },
-            { label: 'Goals', value: profile?.goals || 0, icon: 'football-outline' },
-            { label: 'Assists', value: profile?.assists || 0, icon: 'flash-outline' },
-          ].map(stat => (
-            <View key={stat.label} style={styles.statGlass}>
-              <Ionicons name={stat.icon as any} size={20} color="#666" />
-              <Text style={styles.statVal}>{stat.value}</Text>
-              <Text style={styles.statLbl}>{stat.label}</Text>
-            </View>
-          ))}
+          {profile?.position === 'GK' ? (
+            <>
+              {[
+                { label: 'Matches', value: profile?.matches || 0, icon: 'calendar-outline', type: 'ion' },
+                { label: 'Clean Sheets', value: profile?.totalCleanSheets || 0, icon: 'shield-check-outline', type: 'mci' },
+                { label: 'Total Saves', value: profile?.totalSaves || 0, icon: 'hand-front-right-outline', type: 'mci' },
+              ].map(stat => (
+                <View key={stat.label} style={styles.statGlass}>
+                  {stat.type === 'ion' ? (
+                    <Ionicons name={stat.icon as any} size={20} color="#666" />
+                  ) : (
+                    <MaterialCommunityIcons name={stat.icon as any} size={20} color={Colors.dark.tint} />
+                  )}
+                  <Text style={styles.statVal}>{stat.value}</Text>
+                  <Text style={styles.statLbl}>{stat.label}</Text>
+                </View>
+              ))}
+            </>
+          ) : (
+            <>
+              {[
+                { label: 'Matches', value: profile?.matches || 0, icon: 'calendar-outline' },
+                { label: 'Goals', value: profile?.goals || 0, icon: 'football-outline' },
+                { label: 'Assists', value: profile?.assists || 0, icon: 'flash-outline' },
+              ].map(stat => (
+                <View key={stat.label} style={styles.statGlass}>
+                  <Ionicons name={stat.icon as any} size={20} color="#666" />
+                  <Text style={styles.statVal}>{stat.value}</Text>
+                  <Text style={styles.statLbl}>{stat.label}</Text>
+                </View>
+              ))}
+            </>
+          )}
         </View>
 
         {/* ── Action Row ── */}
