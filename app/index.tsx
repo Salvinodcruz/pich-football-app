@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius, FontSizes, FontWeights } from '@/constants/theme';
+import PremiumBackground from '@/src/components/PremiumBackground';
 
 const { height } = Dimensions.get('window');
 
@@ -32,6 +33,7 @@ export default function OnboardingScreen() {
 
   return (
     <View style={styles.container}>
+      <PremiumBackground />
       {/* Top Section — Logo + Text */}
       <Animated.View
         style={[
@@ -90,7 +92,7 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: '#050505',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,

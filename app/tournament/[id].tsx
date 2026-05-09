@@ -9,7 +9,8 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/src/config/firebase';
 import { getTournament, joinTournament } from '@/src/utils/tournamentService';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
-import ChevronBackground from '@/src/components/ChevronBackground';
+import PremiumBackground from '@/src/components/PremiumBackground';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function TournamentScreen() {
   const insets = useSafeAreaInsets();
@@ -82,9 +83,10 @@ export default function TournamentScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
-      <ChevronBackground />
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
       <ScrollView
+        showsVerticalScrollIndicator={false}
         style={styles.container}
         contentContainerStyle={[styles.content, {
           paddingTop: insets.top + Spacing.md,
@@ -92,12 +94,17 @@ export default function TournamentScreen() {
         }]}
       >
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={styles.backText}>← Back</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Ionicons name="chevron-back" size={20} color={Colors.dark.tint} />
+          <Text style={styles.backText}>Back</Text>
+        </View>
       </TouchableOpacity>
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.trophyIcon}>🏆</Text>
+        <View style={styles.trophyContainer}>
+          <Ionicons name="trophy" size={48} color={Colors.dark.tint} />
+        </View>
         <Text style={styles.name}>{tournament.name}</Text>
         <Text style={[styles.status, { color: getStatusColor(tournament.status) }]}>
           {tournament.status?.toUpperCase()}
@@ -160,16 +167,24 @@ export default function TournamentScreen() {
         >
           {joining
             ? <ActivityIndicator color="#000" />
-            : <Text style={[styles.joinBtnText, isJoined && styles.joinedBtnText]}>
-                {isJoined ? '✓ Joined' : isFull ? 'Tournament Full' : '+ Join Tournament'}
-              </Text>
+            : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name={isJoined ? "checkmark-circle" : isFull ? "alert-circle" : "add-circle"} size={20} color={isJoined ? Colors.dark.tint : "#000"} />
+                <Text style={[styles.joinBtnText, isJoined && styles.joinedBtnText]}>
+                  {isJoined ? 'Joined' : isFull ? 'Tournament Full' : 'Join Tournament'}
+                </Text>
+              </View>
+            )
           }
         </TouchableOpacity>
       )}
 
       {isCreator && (
         <View style={styles.creatorBadge}>
-          <Text style={styles.creatorText}>👑 You created this tournament</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="star" size={16} color="#FFC107" />
+            <Text style={styles.creatorText}>You created this tournament</Text>
+          </View>
         </View>
       )}
     </ScrollView>
@@ -178,32 +193,32 @@ export default function TournamentScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.dark.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: Spacing.lg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.dark.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#050505' },
   backBtn: { marginBottom: Spacing.lg },
-  backText: { color: Colors.dark.tint, fontSize: FontSizes.md },
+  backText: { color: Colors.dark.tint, fontSize: FontSizes.md, fontWeight: FontWeights.bold },
   header: { alignItems: 'center', marginBottom: Spacing.xl },
-  trophyIcon: { fontSize: 48, marginBottom: Spacing.sm },
+  trophyContainer: { marginBottom: Spacing.sm },
   name: { fontSize: FontSizes.xl, fontWeight: FontWeights.bold, color: Colors.dark.text, textAlign: 'center' },
   status: { fontSize: FontSizes.sm, fontWeight: FontWeights.bold, marginTop: 4 },
   meta: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm, marginTop: 4 },
-  card: { backgroundColor: Colors.dark.card, borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.dark.border },
+  card: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: Spacing.md, marginBottom: Spacing.lg, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: Spacing.sm },
   detailLabel: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm },
   detailValue: { color: Colors.dark.text, fontSize: FontSizes.sm, fontWeight: FontWeights.semibold },
-  divider: { height: 1, backgroundColor: Colors.dark.border },
+  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)' },
   progressSection: { marginBottom: Spacing.xl },
   progressLabel: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm, marginBottom: Spacing.sm },
-  progressBar: { height: 8, backgroundColor: Colors.dark.card, borderRadius: 4, overflow: 'hidden' },
+  progressBar: { height: 8, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: Colors.dark.tint, borderRadius: 4 },
   joinBtn: { backgroundColor: Colors.dark.tint, borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center' },
-  joinedBtn: { backgroundColor: Colors.dark.card, borderWidth: 1, borderColor: Colors.dark.tint },
-  fullBtn: { backgroundColor: Colors.dark.card, borderWidth: 1, borderColor: Colors.dark.border },
+  joinedBtn: { backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: Colors.dark.tint },
+  fullBtn: { backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   joinBtnDisabled: { opacity: 0.6 },
   joinBtnText: { color: '#000', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
   joinedBtnText: { color: Colors.dark.tint },
-  creatorBadge: { backgroundColor: Colors.dark.card, borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center', borderWidth: 1, borderColor: '#FFC107' },
+  creatorBadge: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: Spacing.md, alignItems: 'center', borderWidth: 1, borderColor: '#FFC107' },
   creatorText: { color: '#FFC107', fontSize: FontSizes.sm, fontWeight: FontWeights.semibold },
   errorText: { color: Colors.dark.textSecondary, fontSize: FontSizes.md },
 });

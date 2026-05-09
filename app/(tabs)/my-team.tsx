@@ -7,8 +7,8 @@ import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import type { Team } from '@/src/types';
 import * as ImagePicker from 'expo-image-picker';
-import ChevronBackground from '@/src/components/ChevronBackground';
-
+import PremiumBackground from '@/src/components/PremiumBackground';
+import { Ionicons } from '@expo/vector-icons';
 
 const TEAM_COLORS = ['#00E676', '#FF6B6B', '#4FC3F7', '#FFD54F', '#CE93D8', '#FF8A65'];
 const FORMATS = ['5-a-side', '7-a-side', '11-a-side'];
@@ -25,14 +25,7 @@ function SwitchToPickupBanner({ onSwitch }: { onSwitch: () => void }) {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const permTeamId = userDoc.data()?.permanentTeamId;
       if (!permTeamId) return;
-      // Check if user has a pickup team saved
-      const userSnap = await getDoc(doc(db, 'users', user.uid));
-      // Find any pickup team where user is a player
-      const q = await getDocs(
-        query(collection(db, 'teams'),
-          where('players', 'array-contains', user.uid),
-          where('isPickup', '==', true))
-      );
+      const q = await getDocs(query(collection(db, 'teams'), where('players', 'array-contains', user.uid), where('isPickup', '==', true)));
       if (!q.empty) setPickupTeam({ id: q.docs[0].id, ...q.docs[0].data() });
     };
     check();
@@ -41,22 +34,19 @@ function SwitchToPickupBanner({ onSwitch }: { onSwitch: () => void }) {
   if (!pickupTeam) return null;
 
   return (
-    <TouchableOpacity
-      style={{
-        backgroundColor: '#4FC3F720', borderRadius: 8, padding: 10,
-        marginBottom: 12, borderWidth: 1, borderColor: '#4FC3F7',
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'
-      }}
-      onPress={async () => {
-        const user = auth.currentUser;
-        if (!user) return;
+    <TouchableOpacity style={styles.switchBanner} onPress={async () => {
+        const user = auth.currentUser; if (!user) return;
         await updateDoc(doc(db, 'users', user.uid), { teamId: pickupTeam.id });
-        onSwitch();
-        Alert.alert('✅ Switched!', `Now viewing ${pickupTeam.name}`);
-      }}
-    >
-      <Text style={{ color: '#4FC3F7', fontSize: 12 }}>⚡ You have a pickup team: {pickupTeam.name}</Text>
-      <Text style={{ color: '#4FC3F7', fontSize: 12, fontWeight: '700' }}>Switch →</Text>
+        onSwitch(); Alert.alert('Switched!', `Now viewing ${pickupTeam.name}`);
+      }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Ionicons name="flash" size={14} color="#4FC3F7" />
+        <Text style={styles.switchBannerText}>Pickup: {pickupTeam.name}</Text>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <Text style={styles.switchBannerAction}>Switch</Text>
+        <Ionicons name="arrow-forward" size={12} color="#4FC3F7" />
+      </View>
     </TouchableOpacity>
   );
 }
@@ -72,6 +62,7 @@ export default function MyTeamScreen() {
   const [players, setPlayers] = useState<any[]>([]);
   const [isCaptain, setIsCaptain] = useState(false);
   const [myName, setMyName] = useState('');
+  const [joinRequests, setJoinRequests] = useState<any[]>([]);
 
   // Add player
   const [showAddPlayer, setShowAddPlayer] = useState(false);
@@ -83,8 +74,8 @@ export default function MyTeamScreen() {
   const [showEditTeam, setShowEditTeam] = useState(false);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('');
-  const [editFormat, setEditFormat] = useState('');
-  const [editFormats, setEditFormats] = useState<string[]>([]);  const [editEmirate, setEditEmirate] = useState('');
+  const [editFormats, setEditFormats] = useState<string[]>([]);
+  const [editEmirate, setEditEmirate] = useState('');
   const [editSkill, setEditSkill] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -113,21 +104,23 @@ export default function MyTeamScreen() {
 
       const teamData = { id: teamDoc.id, ...teamDoc.data() } as Team;
       setTeam(teamData);
-      setIsCaptain(teamData.captainId === user.uid);
+      const isCap = teamData.captainId === user.uid;
+      setIsCaptain(isCap);
 
-      // Auto-generate teamCode if missing
+      if (isCap) {
+        const { getPendingJoinRequests } = await import('@/src/utils/teamService');
+        const reqs = await getPendingJoinRequests(teamId);
+        setJoinRequests(reqs);
+      }
+
       if (!(teamData as any).teamCode) {
         const newCode = 'PCT-' + Math.random().toString(36).substring(2, 7).toUpperCase();
         await updateDoc(doc(db, 'teams', teamId), { teamCode: newCode });
         (teamData as any).teamCode = newCode;
       }
 
-      
-
-      // Set edit defaults
       setEditName(teamData.name);
       setEditColor((teamData as any).color || '#00E676');
-      setEditFormat(teamData.format);
       setEditFormats((teamData as any).formats || (teamData.format ? [teamData.format] : ['7-a-side']));
       setEditEmirate(teamData.emirate);
       setEditSkill(teamData.skillLevel);
@@ -135,10 +128,7 @@ export default function MyTeamScreen() {
       const playerProfiles: any[] = [];
       for (const pid of teamData.players || []) {
         const pDoc = await getDoc(doc(db, 'users', pid));
-        if (pDoc.exists()) {
-          console.log('Player data:', JSON.stringify(pDoc.data()));
-          playerProfiles.push({ id: pDoc.id, ...pDoc.data() });
-        }
+        if (pDoc.exists()) playerProfiles.push({ id: pDoc.id, ...pDoc.data() });
       }
       setPlayers(playerProfiles);
     } catch (e) {
@@ -149,13 +139,18 @@ export default function MyTeamScreen() {
     }
   };
 
-  // Team chat listener
+  const handleRespondJoin = async (requestId: string, approve: boolean) => {
+    try {
+      const { respondToJoinRequest } = await import('@/src/utils/teamService');
+      await respondToJoinRequest(requestId, approve);
+      Alert.alert(approve ? 'Approved!' : 'Denied');
+      load();
+    } catch (e) { Alert.alert('Error'); }
+  };
+
   useEffect(() => {
     if (!team?.id || !showChat) return;
-    const q = query(
-      collection(db, 'teamChats', team.id, 'messages'),
-      orderBy('createdAt', 'asc')
-    );
+    const q = query(collection(db, 'teamChats', team.id, 'messages'), orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(q, snap => {
       setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
@@ -174,207 +169,125 @@ export default function MyTeamScreen() {
         createdAt: new Date().toISOString(),
       });
       setChatText('');
-    } catch (e) {
-      Alert.alert('Error', 'Could not send message');
-    } finally {
-      setSendingMsg(false);
-    }
+    } catch (e) { Alert.alert('Error', 'Could not send message'); } finally { setSendingMsg(false); }
   };
 
   const handleLogoUpload = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please allow access to your photo library');
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.3,
-        base64: true,
-      });
+      if (status !== 'granted') return;
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.3, base64: true });
       if (result.canceled || !result.assets[0].base64) return;
       setUploadingLogo(true);
       const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
       await updateDoc(doc(db, 'teams', team!.id), { logoURL: base64Image });
       await load();
-      Alert.alert('✅ Logo Updated!', 'Team logo has been updated');
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Error', 'Could not upload logo');
-    } finally {
-      setUploadingLogo(false);
-    }
+    } catch (e) { Alert.alert('Error', 'Could not upload logo'); } finally { setUploadingLogo(false); }
   };
-
 
   const handleSaveTeam = async () => {
     if (!editName.trim() || !team) return;
-    if (editFormats.length === 0) {
-      Alert.alert('Select Format', 'Please select at least one format');
-      return;
-    }
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'teams', team.id), {
-        name: editName.trim(),
-        color: editColor,
-        formats: editFormats,
-        format: editFormats[0],
-        emirate: editEmirate,
-        skillLevel: editSkill,
-      });
-      setShowEditTeam(false);
-      load();
-      Alert.alert('Saved! ✅', 'Team details updated');
-    } catch (e) {
-      Alert.alert('Error', 'Could not save changes');
-    } finally {
-      setSaving(false);
-    }
+      await updateDoc(doc(db, 'teams', team.id), { name: editName.trim(), color: editColor, formats: editFormats, format: editFormats[0], emirate: editEmirate, skillLevel: editSkill });
+      setShowEditTeam(false); load();
+    } catch (e) { Alert.alert('Error', 'Save failed'); } finally { setSaving(false); }
   };
 
   const searchPlayer = async () => {
     if (!searchId.trim()) return;
     setSearching(true);
-    setSearchResult(null);
     try {
       const q = query(collection(db, 'users'), where('playerId', '==', searchId.trim().toUpperCase()));
       const snap = await getDocs(q);
-      if (snap.empty) {
-        Alert.alert('Not Found', 'No player found with that ID');
-      } else {
-        setSearchResult({ id: snap.docs[0].id, ...snap.docs[0].data() });
-      }
-    } catch (e) {
-      Alert.alert('Error', 'Search failed');
-    } finally {
-      setSearching(false);
-    }
+      if (snap.empty) Alert.alert('Not Found');
+      else setSearchResult({ id: snap.docs[0].id, ...snap.docs[0].data() });
+    } catch (e) { Alert.alert('Error', 'Search failed'); } finally { setSearching(false); }
   };
 
   const addPlayer = async () => {
     if (!searchResult || !team) return;
-    if (team.players?.includes(searchResult.id)) {
-      Alert.alert('Already in Team', 'This player is already in your team');
-      return;
-    }
     try {
-      await updateDoc(doc(db, 'teams', team.id), {
-        players: [...(team.players || []), searchResult.id],
-      });
-      await updateDoc(doc(db, 'users', searchResult.id), { teamId: team.id });
-      Alert.alert('Player Added! ✅', `${searchResult.firstName || searchResult.name} added`);
-      setSearchResult(null);
-      setSearchId('');
-      setShowAddPlayer(false);
-      load();
-    } catch (e) {
-      Alert.alert('Error', 'Could not add player');
-    }
+      await updateDoc(doc(db, 'teams', team.id), { players: [...(team.players || []), searchResult.id] });
+      await updateDoc(doc(db, 'users', searchResult.id), { teamId: team.id, isFreeAgent: false });
+      setShowAddPlayer(false); load();
+    } catch (e) { Alert.alert('Error', 'Could not add player'); }
   };
 
   const removePlayer = async (playerId: string, playerName: string) => {
     if (!team) return;
-    if (playerId === team.captainId) {
-      Alert.alert('Cannot Remove', 'Transfer captaincy first.');
-      return;
-    }
     Alert.alert('Remove Player', `Remove ${playerName}?`, [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove', style: 'destructive', onPress: async () => {
-          try {
-            await updateDoc(doc(db, 'teams', team.id), { players: arrayRemove(playerId) });
-            await updateDoc(doc(db, 'users', playerId), { teamId: null });
-            load();
-          } catch (e) {
-            Alert.alert('Error', 'Could not remove player');
-          }
-        }
-      }
+      { text: 'Remove', style: 'destructive', onPress: async () => {
+        try {
+          await updateDoc(doc(db, 'teams', team.id), { players: arrayRemove(playerId) });
+          await updateDoc(doc(db, 'users', playerId), { teamId: null });
+          load();
+        } catch (e) { Alert.alert('Error'); }
+      }}
     ]);
   };
 
   const transferCaptaincy = async (newCaptainId: string, newCaptainName: string) => {
     if (!team) return;
-    Alert.alert('Transfer Captaincy', `Make ${newCaptainName} the captain?`, [
+    Alert.alert('Transfer Captaincy', `Make ${newCaptainName} captain?`, [
       { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Transfer', onPress: async () => {
-          try {
-            await updateDoc(doc(db, 'teams', team.id), {
-              captainId: newCaptainId,
-              captainName: newCaptainName,
-            });
-            Alert.alert('Done! 👑', `${newCaptainName} is now captain`);
-            load();
-          } catch (e) {
-            Alert.alert('Error', 'Could not transfer captaincy');
-          }
-        }
-      }
+      { text: 'Transfer', onPress: async () => {
+        try {
+          await updateDoc(doc(db, 'teams', team.id), { captainId: newCaptainId, captainName: newCaptainName });
+          load();
+        } catch (e) { Alert.alert('Error'); }
+      }}
     ]);
   };
 
   const changePlayerPosition = async (playerId: string, newPosition: string) => {
-    try {
-      await updateDoc(doc(db, 'users', playerId), {
-        teamPosition: newPosition,
-      });
-      Alert.alert('Updated! ✅', `Position changed to ${newPosition}`);
-      load();
-    } catch (e) {
-      Alert.alert('Error', 'Could not change position');
-    }
+    try { await updateDoc(doc(db, 'users', playerId), { teamPosition: newPosition }); load(); }
+    catch (e) { Alert.alert('Error'); }
   };
 
   const getPositionColor = (pos: string) => {
-    if (pos === 'GK') return '#FFC107';
-    if (pos === 'DEF') return '#4FC3F7';
-    if (pos === 'MID') return Colors.dark.tint;
-    if (pos === 'FWD') return '#FF6B6B';
+    if (pos === 'GK') return '#FFC107'; if (pos === 'DEF') return '#4FC3F7';
+    if (pos === 'MID') return Colors.dark.tint; if (pos === 'FWD') return '#FF6B6B';
     return Colors.dark.textSecondary;
   };
 
   if (loading) return (
-    <View style={styles.center}>
-      <ActivityIndicator size="large" color={Colors.dark.tint} />
-    </View>
+    <View style={styles.center}><ActivityIndicator size="large" color={Colors.dark.tint} /></View>
   );
 
   if (!team) return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
-      <ChevronBackground />
-      <ScrollView
-        style={[styles.container, { backgroundColor: 'transparent' }]}
-        contentContainerStyle={[styles.content, {
-          paddingTop: insets.top + Spacing.md,
-          paddingBottom: insets.bottom + 80,
-        }]}
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
+      <ScrollView 
+        style={{ flex: 1 }} 
+        contentContainerStyle={{ padding: Spacing.lg, paddingTop: insets.top + Spacing.md }}
+        showsVerticalScrollIndicator={false}
       >
-      <Text style={styles.pageTitle}>My Team</Text>
-      <Text style={styles.noTeamSubtitle}>You are not part of a team yet</Text>
-      <View style={styles.options}>
-        <View style={styles.optionCard}>
-          <Text style={styles.optionTitle}>⚽ Create a Team</Text>
-          <Text style={styles.optionText}>Start your own team and become captain</Text>
-          <TouchableOpacity style={styles.optionBtn} onPress={() => router.push('/create-team')}>
-            <Text style={styles.optionBtnText}>Create Team</Text>
-          </TouchableOpacity>
+        <Text style={styles.pageTitle}>My Team</Text>
+        <Text style={styles.noTeamSubtitle}>You are not part of a team yet</Text>
+        <View style={styles.options}>
+          <View style={styles.optionCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Ionicons name="football" size={24} color={Colors.dark.tint} />
+              <Text style={styles.optionTitle}>Create a Team</Text>
+            </View>
+            <TouchableOpacity style={styles.ctaBtn} onPress={() => router.push('/create-team')}>
+              <Text style={styles.ctaBtnText}>Create Team</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.optionCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Ionicons name="search" size={24} color={Colors.dark.tint} />
+              <Text style={styles.optionTitle}>Find a Team</Text>
+            </View>
+            <TouchableOpacity style={styles.ctaBtn} onPress={() => router.push('/(tabs)/find')}>
+              <Text style={styles.ctaBtnText}>Browse Teams</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        <View style={styles.optionCard}>
-          <Text style={styles.optionTitle}>🔍 Find a Team</Text>
-          <Text style={styles.optionText}>Browse teams looking for players</Text>
-          <TouchableOpacity style={styles.optionBtn} onPress={() => router.push('/(tabs)/find')}>
-            <Text style={styles.optionBtnText}>Browse Teams</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </ScrollView>
-  </View>
+      </ScrollView>
+    </View>
   );
 
   const topScorer = players.reduce((top, p) => (p.goals || 0) > (top?.goals || 0) ? p : top, null);
@@ -382,255 +295,139 @@ export default function MyTeamScreen() {
   const myUid = auth.currentUser?.uid;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
-      <ChevronBackground />
-      <ScrollView ref={scrollRef} style={styles.container}
-        contentContainerStyle={[styles.content, {
-          paddingTop: insets.top + Spacing.md,
-          paddingBottom: insets.bottom + 80,
-        }]}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={Colors.dark.tint} />
-        }
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
+      <ScrollView 
+        ref={scrollRef} 
+        style={[styles.container, { backgroundColor: 'transparent' }]} 
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.md, paddingBottom: insets.bottom + 80 }]} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={Colors.dark.tint} />}
       >
-        {/* Team Header */}
-        <View style={styles.teamHeader}>
-          <TouchableOpacity
-            style={[styles.teamBadge, { backgroundColor: (team as any).color || Colors.dark.tint }]}
-            onPress={isCaptain ? handleLogoUpload : undefined}
-            disabled={uploadingLogo}
-          >
-            {uploadingLogo ? (
-              <ActivityIndicator color="#000" size="small" />
-            ) : (team as any).logoURL ? (
-              <Image source={{ uri: (team as any).logoURL }} style={styles.teamLogoImg} />
-            ) : (
-              <Text style={styles.teamBadgeText}>{team.name.substring(0, 2).toUpperCase()}</Text>
-            )}
+        <View style={styles.headerGlass}>
+          <TouchableOpacity style={[styles.teamBadge, { backgroundColor: (team as any).color || Colors.dark.tint }]} onPress={isCaptain ? handleLogoUpload : undefined} disabled={uploadingLogo}>
+            {uploadingLogo ? <ActivityIndicator color="#000" size="small" /> : (team as any).logoURL ? <Image source={{ uri: (team as any).logoURL }} style={styles.teamLogoImg} /> : <Text style={styles.teamBadgeText}>{team.name.substring(0, 2).toUpperCase()}</Text>}
             {isCaptain && !(team as any).logoURL && (
-              <View style={styles.logoEditHint}>
-                <Text style={styles.logoEditHintText}>📷</Text>
+              <View style={styles.cameraIcon}>
+                <Ionicons name="camera" size={12} color="#000" />
               </View>
             )}
           </TouchableOpacity>
-
           <View style={{ flex: 1 }}>
             <Text style={styles.teamName}>{team.name}</Text>
-            <Text style={styles.teamMeta}>{team.emirate} · {team.format} · {team.skillLevel}</Text>
+            <Text style={styles.teamMeta}>{team.emirate} · {team.format}</Text>
             {(team as any).teamCode && (
-              <Text style={styles.teamCode}>{(team as any).teamCode}</Text>
+              <View style={styles.teamCodeBadge}>
+                <Text style={styles.teamCodeText}>{(team as any).teamCode}</Text>
+              </View>
             )}
           </View>
           {isCaptain && (
             <TouchableOpacity style={styles.captainTag} onPress={() => setShowEditTeam(true)}>
-              <Text style={styles.captainTagText}>👑 Edit Team</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="settings-outline" size={14} color={Colors.dark.tint} />
+                <Text style={styles.captainTagText}>Edit</Text>
+              </View>
             </TouchableOpacity>
           )}
-          {!isCaptain && (
-            <View style={styles.memberTag}>
-              <Text style={styles.memberTagText}>⚽ Player</Text>
-            </View>
-          )}
         </View>
 
-        {/* Convert pickup to permanent — only for pickup teams */}
-        {isCaptain && (team as any).isPickup && (
-          <TouchableOpacity
-            style={styles.convertPickupBtn}
-            onPress={() => {
-              Alert.alert(
-                '🔄 Convert to Permanent Team?',
-                'This will make the team permanent and it won\'t auto-delete.',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Convert', onPress: async () => {
-                      const { convertPickupToPermanent } = await import('@/src/utils/friendsService');
-                      await convertPickupToPermanent(team.id);
-                      load();
-                      Alert.alert('✅ Done!', 'Team is now permanent!');
-                    }
-                  }
-                ]
-              );
-            }}
-          >
-            <Text style={styles.convertPickupBtnText}>🔄 Convert to Permanent</Text>
-          </TouchableOpacity>
-        )}
+        {!(team as any).isPickup && <SwitchToPickupBanner onSwitch={load} />}
 
-        {/* Pickup team warning */}
-        {(team as any).isPickup && (
-          <View style={styles.pickupWarning}>
-            <Text style={styles.pickupWarningText}>
-              ⚡ Pickup Team — auto-deletes 48hrs after creation
-            </Text>
-            <View style={styles.pickupBtnRow}>
-              {/* Switch back to permanent team */}
-              <TouchableOpacity
-                style={styles.switchTeamBtn}
-                onPress={async () => {
-                  const user = auth.currentUser;
-                  if (!user) return;
-                  const userDoc = await getDoc(doc(db, 'users', user.uid));
-                  const permTeamId = userDoc.data()?.permanentTeamId;
-                  if (!permTeamId) {
-                    Alert.alert('No permanent team', 'You have no permanent team to switch back to.');
-                    return;
-                  }
-                  await updateDoc(doc(db, 'users', user.uid), { teamId: permTeamId });
-                  load();
-                  Alert.alert('✅ Switched!', 'Back to your permanent team.');
-                }}
-              >
-                <Text style={styles.switchTeamBtnText}>↩ Switch to Main Team</Text>
-              </TouchableOpacity>
-
-              {/* Delete pickup team */}
-              {isCaptain && (
-                <TouchableOpacity
-                  style={styles.deletePickupBtn}
-                  onPress={() => {
-                    Alert.alert(
-                      'Delete Pickup Team',
-                      'This will delete the pickup team. Player stats are kept.',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'Delete', style: 'destructive',
-                          onPress: async () => {
-                            try {
-                              const { deletePickupTeam } = await import('@/src/utils/friendsService');
-                              await deletePickupTeam(team.id);
-                              load();
-                              Alert.alert('✅ Deleted', 'Pickup team deleted. Stats kept.');
-                            } catch (e) {
-                              Alert.alert('Error', 'Could not delete team');
-                            }
-                          }
-                        }
-                      ]
-                    );
-                  }}
-                >
-                  <Text style={styles.deletePickupBtnText}>🗑 Delete Pickup</Text>
-                </TouchableOpacity>
-              )}
+        {/* Join Requests */}
+        {isCaptain && joinRequests.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Join Requests ({joinRequests.length})</Text>
+            <View style={styles.glassContainer}>
+              {joinRequests.map((req, i) => (
+                <View key={req.id} style={[styles.playerRowGlass, i === joinRequests.length - 1 && { borderBottomWidth: 0 }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.playerName}>{req.userName}</Text>
+                    <Text style={styles.playerIdText}>Wants to join</Text>
+                  </View>
+                  <View style={styles.requestActions}>
+                    <TouchableOpacity style={styles.approveBtn} onPress={() => handleRespondJoin(req.id, true)}>
+                      <Ionicons name="checkmark" size={16} color="#000" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.denyBtn} onPress={() => handleRespondJoin(req.id, false)}>
+                      <Ionicons name="close" size={16} color="#FF4444" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
             </View>
           </View>
         )}
 
-        {/* Switch to pickup team if on permanent team and has a pickup */}
-        {!(team as any).isPickup && (
-          <SwitchToPickupBanner onSwitch={load} />
-        )}
-
-        {/* Stats Grid */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>{totalGames}</Text>
-            <Text style={styles.statLabel}>Played</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: Colors.dark.tint }]}>{team.wins || 0}</Text>
-            <Text style={styles.statLabel}>Won</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: '#FFC107' }]}>{team.draws || 0}</Text>
-            <Text style={styles.statLabel}>Draw</Text>
-          </View>
-          <View style={styles.statBox}>
-            <Text style={[styles.statValue, { color: '#FF4444' }]}>{team.losses || 0}</Text>
-            <Text style={styles.statLabel}>Lost</Text>
-          </View>
+        <View style={styles.statsGridGlass}>
+          <View style={styles.statBoxGlass}><Text style={styles.statValue}>{totalGames}</Text><Text style={styles.statLabel}>Played</Text></View>
+          <View style={styles.statBoxGlass}><Text style={[styles.statValue, { color: Colors.dark.tint }]}>{team.wins || 0}</Text><Text style={styles.statLabel}>Won</Text></View>
+          <View style={styles.statBoxGlass}><Text style={[styles.statValue, { color: '#FFC107' }]}>{team.draws || 0}</Text><Text style={styles.statLabel}>Draw</Text></View>
+          <View style={styles.statBoxGlass}><Text style={[styles.statValue, { color: '#FF4444' }]}>{team.losses || 0}</Text><Text style={styles.statLabel}>Lost</Text></View>
         </View>
 
-        {/* Rating & Trust Row */}
-        <View style={styles.ratingRow}>
-          <View style={styles.ratingBox}>
+        <View style={styles.ratingRowGlass}>
+          <View style={styles.ratingBoxGlass}>
             <Text style={styles.ratingLabel}>Rating</Text>
-            <Text style={styles.ratingValue}>⭐ {team.skillRating ?? 0}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+              <Ionicons name="star" size={12} color="#FFC107" />
+              <Text style={styles.ratingValue}>{team.skillRating ?? 0}</Text>
+            </View>
           </View>
-          <View style={styles.ratingBox}>
+          <View style={styles.ratingBoxGlass}>
             <Text style={styles.ratingLabel}>Trust Score</Text>
-            <Text style={[styles.ratingValue, {
-              color: (team.trustScore || 0) >= 70 ? Colors.dark.tint : (team.trustScore || 0) >= 30 ? '#FFC107' : '#FF4444'
-            }]}>
-              {team.trustScore ?? 100} / 100
-            </Text>
+            <Text style={[styles.ratingValue, { color: (team.trustScore || 0) >= 70 ? Colors.dark.tint : '#FFC107' }]}>{team.trustScore ?? 100}%</Text>
           </View>
           {topScorer && (
-            <View style={styles.ratingBox}>
+            <View style={styles.ratingBoxGlass}>
               <Text style={styles.ratingLabel}>Top Scorer</Text>
-              <Text style={styles.ratingValue} numberOfLines={1}>
-                ⚽ {topScorer.firstName || topScorer.name?.split(' ')[0]} ({topScorer.goals || 0})
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                <Ionicons name="football" size={12} color="#FFF" />
+                <Text style={styles.ratingValue} numberOfLines={1}>{topScorer.firstName || topScorer.name?.split(' ')[0]}</Text>
+              </View>
             </View>
           )}
         </View>
 
-        {/* Action Buttons */}
         <View style={styles.actionBtns}>
           {isCaptain && (
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => router.push('/challenges')}
-            >
-              <Text style={styles.actionBtnText}>⚡ Challenges</Text>
+            <TouchableOpacity style={styles.actionBtnGlass} onPress={() => router.push('/challenges')}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="flash" size={14} color="#000" />
+                <Text style={styles.actionBtnTextGlass}>Challenges</Text>
+              </View>
             </TouchableOpacity>
           )}
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.chatActionBtn]}
-            onPress={() => setShowChat(true)}
-          >
-            <Text style={styles.chatActionBtnText}>💬 Team Chat</Text>
+          <TouchableOpacity style={[styles.actionBtnGlass, styles.chatActionBtnGlass]} onPress={() => setShowChat(true)}>
+             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="chatbubbles-outline" size={14} color="#FFF" />
+                <Text style={styles.chatActionBtnTextGlass}>Team Chat</Text>
+              </View>
           </TouchableOpacity>
           {isCaptain && (
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.addPlayerBtn]}
-              onPress={() => setShowAddPlayer(!showAddPlayer)}
-            >
-              <Text style={[styles.actionBtnText, { color: Colors.dark.tint }]}>
-                {showAddPlayer ? '✕ Cancel' : '+ Add Player'}
-              </Text>
+            <TouchableOpacity style={[styles.actionBtnGlass, styles.addPlayerBtnGlass]} onPress={() => setShowAddPlayer(!showAddPlayer)}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name={showAddPlayer ? "close" : "person-add-outline"} size={14} color={Colors.dark.tint} />
+                <Text style={[styles.actionBtnTextGlass, { color: Colors.dark.tint }]}>{showAddPlayer ? 'Cancel' : 'Player'}</Text>
+              </View>
             </TouchableOpacity>
           )}
         </View>
 
-        {/* Add Player Search */}
         {showAddPlayer && isCaptain && (
-          <View style={styles.addPlayerSection}>
-            <Text style={styles.sectionTitle}>Add Player by ID</Text>
+          <View style={styles.addPlayerSectionGlass}>
+            <Text style={styles.sectionTitle}>Add Player</Text>
             <View style={styles.searchRow}>
-              <TextInput
-                style={styles.searchInput}
-                value={searchId}
-                onChangeText={setSearchId}
-                placeholder="Enter Player ID (e.g. PCH-A3X9K)"
-                placeholderTextColor={Colors.dark.textSecondary}
-                autoCapitalize="characters"
-              />
+              <TextInput style={styles.searchInput} value={searchId} onChangeText={setSearchId} placeholder="Player ID" placeholderTextColor="#666" autoCapitalize="characters" />
               <TouchableOpacity style={styles.searchBtn} onPress={searchPlayer}>
-                {searching
-                  ? <ActivityIndicator color="#000" size="small" />
-                  : <Text style={styles.searchBtnText}>Search</Text>
-                }
+                {searching ? <ActivityIndicator color="#000" size="small" /> : <Ionicons name="search" size={20} color="#000" />}
               </TouchableOpacity>
             </View>
             {searchResult && (
               <View style={styles.searchResultCard}>
-                <View style={styles.searchResultInfo}>
-                  <View style={styles.searchResultAvatar}>
-                    <Text style={styles.searchResultAvatarText}>
-                      {(searchResult.firstName || 'P').substring(0, 1)}
-                      {(searchResult.lastName || '').substring(0, 1)}
-                    </Text>
-                  </View>
-                  <View>
-                    <Text style={styles.searchResultName}>{searchResult.firstName} {searchResult.lastName}</Text>
-                    <Text style={styles.searchResultMeta}>{searchResult.position} · {searchResult.emirate}</Text>
-                    <Text style={styles.searchResultId}>{searchResult.playerId}</Text>
-                  </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>{searchResult.firstName} {searchResult.lastName}</Text>
+                  <Text style={{ color: '#666', fontSize: 10 }}>{searchResult.playerId}</Text>
                 </View>
                 <TouchableOpacity style={styles.addBtn} onPress={addPlayer}>
                   <Text style={styles.addBtnText}>Add</Text>
@@ -640,218 +437,118 @@ export default function MyTeamScreen() {
           </View>
         )}
 
-        {/* Squad */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Squad — {players.length} player{players.length !== 1 ? 's' : ''}</Text>
-          {players.length === 0 ? (
-            <Text style={styles.emptyText}>No players yet. Add players using their Player ID.</Text>
-          ) : (
-            players.map((player, i) => (
-              <View key={player.id} style={styles.playerRow}>
-                <Text style={styles.playerNumber}>{i + 1}</Text>
-                {player.photoURL ? (
-                  <Image source={{ uri: player.photoURL }} style={styles.playerAvatarImg} />
-                ) : (
-                  <View style={styles.playerAvatar}>
-                    <Text style={styles.playerAvatarText}>
-                      {(player.firstName || player.name || 'P').substring(0, 1)}
-                      {(player.lastName || '').substring(0, 1)}
-                    </Text>
-                  </View>
-                )}
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <View style={styles.playerNameRow}>
-                    <Text style={styles.playerName} numberOfLines={1}>
-                      {player.firstName ? `${player.firstName} ${player.lastName}` : player.name || 'Unknown'}
-                    </Text>
-                    {player.id === team.captainId && (
-                      <View style={styles.captainBadge}>
-                        <Text style={styles.captainBadgeText}>C</Text>
-                      </View>
-                    )}
+          <Text style={styles.sectionTitle}>Squad ({players.length})</Text>
+          <View style={styles.glassContainer}>
+            {players.map((player, i) => (
+              <View key={player.id} style={[styles.playerRowGlass, i === players.length - 1 && { borderBottomWidth: 0 }]}>
+                {player.photoURL ? <Image source={{ uri: player.photoURL }} style={styles.playerAvatarImg} /> : <View style={styles.playerAvatar}><Text style={styles.playerAvatarText}>{(player.firstName || 'P')[0]}</Text></View>}
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={styles.playerName}>{player.firstName ? `${player.firstName} ${player.lastName}` : player.name}</Text>
+                    {player.id === team.captainId && <Ionicons name="ribbon" size={12} color={Colors.dark.tint} />}
                   </View>
                   <Text style={styles.playerIdText}>{player.playerId}</Text>
                 </View>
-                <View style={[styles.posBadge, { borderColor: getPositionColor(player.teamPosition || player.position) }]}>
-                  <Text style={[styles.posText, { color: getPositionColor(player.teamPosition || player.position) }]}>
-                    {player.teamPosition || player.position || '?'}
-                  </Text>
-                </View>
-
-                <View style={styles.playerStats}>
-                  <Text style={styles.playerStatText}>⚽ {player.goals || 0}</Text>
-                  <Text style={styles.playerStatText}>🎯 {player.assists || 0}</Text>
+                <View style={[styles.posBadge, { borderColor: getPositionColor(player.teamPosition || player.position) }]}><Text style={[styles.posText, { color: getPositionColor(player.teamPosition || player.position) }]}>{player.teamPosition || player.position || '?'}</Text></View>
+                <View style={{ gap: 2, alignItems: 'flex-end' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="football-outline" size={10} color="#666" />
+                    <Text style={styles.playerStatText}>{player.goals || 0}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="flash-outline" size={10} color="#666" />
+                    <Text style={styles.playerStatText}>{player.assists || 0}</Text>
+                  </View>
                 </View>
                 {isCaptain && player.id !== team.captainId && (
-                  <TouchableOpacity
-                    style={styles.moreBtn}
-                    onPress={() => Alert.alert(
-                      player.firstName || player.name,
-                      'What do you want to do?',
-                      [
-                        { text: '👑 Make Captain', onPress: () => transferCaptaincy(player.id, `${player.firstName || ''} ${player.lastName || player.name || ''}`.trim()) },
-                        {
-                          text: '📍 Change Position',
-                          onPress: () => Alert.alert(
-                            'Change Position',
-                            `Current: ${player.teamPosition || player.position || 'None'}`,
-                            [
-                              { text: 'GK', onPress: () => changePlayerPosition(player.id, 'GK') },
-                              { text: 'DEF', onPress: () => changePlayerPosition(player.id, 'DEF') },
-                              { text: 'MID', onPress: () => changePlayerPosition(player.id, 'MID') },
-                              { text: 'FWD', onPress: () => changePlayerPosition(player.id, 'FWD') },
-                              { text: 'Cancel', style: 'cancel' },
-                            ]
-                          )
-                        },
-                        { text: '🗑 Remove from Team', style: 'destructive', onPress: () => removePlayer(player.id, `${player.firstName || player.name}`) },
-                        { text: 'Cancel', style: 'cancel' }
-                      ]
-                    )}
-                  >
-                    <Text style={styles.moreBtnText}>•••</Text>
+                  <TouchableOpacity style={{ padding: 4 }} onPress={() => Alert.alert(player.firstName, 'Action', [
+                    { text: '👑 Captain', onPress: () => transferCaptaincy(player.id, player.firstName) },
+                    { text: '📍 Position', onPress: () => Alert.alert('Position', 'Select', [
+                      { text: 'GK', onPress: () => changePlayerPosition(player.id, 'GK') },
+                      { text: 'DEF', onPress: () => changePlayerPosition(player.id, 'DEF') },
+                      { text: 'MID', onPress: () => changePlayerPosition(player.id, 'MID') },
+                      { text: 'FWD', onPress: () => changePlayerPosition(player.id, 'FWD') },
+                      { text: 'Cancel', style: 'cancel' }
+                    ])},
+                    { text: '🗑 Remove', style: 'destructive', onPress: () => removePlayer(player.id, player.firstName) },
+                    { text: 'Cancel', style: 'cancel' }
+                  ])}>
+                    <Ionicons name="ellipsis-horizontal" size={16} color="#666" />
                   </TouchableOpacity>
                 )}
               </View>
-            ))
-          )}
+            ))}
+          </View>
         </View>
       </ScrollView>
 
-      {/* Edit Team Modal */}
       <Modal visible={showEditTeam} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowEditTeam(false)}>
         <View style={styles.modalWrapper}>
-          <ScrollView contentContainerStyle={styles.modalContent}>
+          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit Team</Text>
               <TouchableOpacity onPress={() => setShowEditTeam(false)}>
-                <Text style={styles.modalClose}>✕ Close</Text>
+                <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
-
             <Text style={styles.inputLabel}>Team Name</Text>
-            <TextInput
-              style={styles.input}
-              value={editName}
-              onChangeText={setEditName}
-              placeholder="Team name"
-              placeholderTextColor={Colors.dark.textSecondary}
-              autoCapitalize="words"
-            />
-
-
-            <Text style={styles.teamMeta}>{team.emirate} · {team.format} · {team.skillLevel}</Text>
-
-            <Text style={styles.inputLabel}>Team Color</Text>
+            <TextInput style={styles.input} value={editName} onChangeText={setEditName} placeholderTextColor="#666" />
+            
+            <Text style={styles.inputLabel}>Identity Color</Text>
             <View style={styles.colorRow}>
               {TEAM_COLORS.map(c => (
-                <TouchableOpacity
-                  key={c}
-                  style={[styles.colorDot, { backgroundColor: c }, editColor === c && styles.colorDotSelected]}
-                  onPress={() => setEditColor(c)}
-                />
+                <TouchableOpacity key={c} style={[styles.colorDot, { backgroundColor: c }, editColor === c && { borderWidth: 3, borderColor: '#fff' }]} onPress={() => setEditColor(c)} />
               ))}
             </View>
 
-            <Text style={styles.inputLabel}>Formats (select all that apply)</Text>
-            <View style={styles.optionRow}>
-              {FORMATS.map(f => (
-                <TouchableOpacity
-                  key={f}
-                  style={[styles.optionBtn, editFormats.includes(f) && styles.optionBtnActive]}
-                  onPress={() => {
-                    setEditFormats(prev =>
-                      prev.includes(f)
-                        ? prev.filter(x => x !== f)
-                        : [...prev, f]
-                    );
-                  }}
-                >
-                  <Text style={[styles.optionText, editFormats.includes(f) && styles.optionTextActive]}>
-                    {f}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.inputLabel}>Emirate</Text>
+            <Text style={styles.inputLabel}>Emirate Base</Text>
             <View style={styles.optionRow}>
               {EMIRATES.map(e => (
-                <TouchableOpacity
-                  key={e}
-                  style={[styles.optionBtn, editEmirate === e && styles.optionBtnActive]}
-                  onPress={() => setEditEmirate(e)}
-                >
+                <TouchableOpacity key={e} style={[styles.optionBtn, editEmirate === e && styles.optionBtnActive]} onPress={() => setEditEmirate(e)}>
                   <Text style={[styles.optionText, editEmirate === e && styles.optionTextActive]}>{e}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={styles.inputLabel}>Skill Level</Text>
-            <View style={styles.optionRow}>
-              {SKILL_LEVELS.map(s => (
-                <TouchableOpacity
-                  key={s}
-                  style={[styles.optionBtn, editSkill === s && styles.optionBtnActive]}
-                  onPress={() => setEditSkill(s)}
-                >
-                  <Text style={[styles.optionText, editSkill === s && styles.optionTextActive]}>{s}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <TouchableOpacity
-              style={[styles.saveBtn, saving && { opacity: 0.6 }]}
-              onPress={handleSaveTeam}
-              disabled={saving}
-            >
-              {saving
-                ? <ActivityIndicator color="#000" />
-                : <Text style={styles.saveBtnText}>Save Changes</Text>
-              }
+            <TouchableOpacity style={styles.saveBtn} onPress={handleSaveTeam} disabled={saving}>
+              {saving ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
             </TouchableOpacity>
           </ScrollView>
         </View>
       </Modal>
 
-      {/* Team Chat Modal */}
       <Modal visible={showChat} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowChat(false)}>
-        <KeyboardAvoidingView
-          style={styles.modalWrapper}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          {/* Chat Header */}
+        <KeyboardAvoidingView style={styles.modalWrapper} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={[styles.chatHeader, { paddingTop: insets.top + Spacing.sm }]}>
             <TouchableOpacity onPress={() => setShowChat(false)}>
-              <Text style={styles.chatBackText}>←</Text>
+              <Ionicons name="arrow-back" size={24} color={Colors.dark.tint} />
             </TouchableOpacity>
-            <View style={styles.chatHeaderInfo}>
-              <Text style={styles.chatHeaderTitle}>Team Chat</Text>
-              <Text style={styles.chatHeaderSub}>{team.name} · {players.length} players</Text>
+            <View style={{ flex: 1, marginLeft: 16 }}>
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Team Chat</Text>
+              <Text style={{ color: '#666', fontSize: 10 }}>{team.name}</Text>
             </View>
           </View>
-
-          {/* Messages */}
-          <ScrollView
-            ref={chatScrollRef}
-            style={styles.chatMessages}
-            contentContainerStyle={styles.chatMessagesContent}
-            onContentSizeChange={() => chatScrollRef.current?.scrollToEnd({ animated: true })}
+          <ScrollView 
+            ref={chatScrollRef} 
+            style={{ flex: 1 }} 
+            contentContainerStyle={{ padding: 16 }} 
+            showsVerticalScrollIndicator={false}
+            onContentSizeChange={() => chatScrollRef.current?.scrollToEnd()}
           >
             {messages.length === 0 ? (
-              <View style={styles.chatEmpty}>
-                <Text style={styles.chatEmptyIcon}>💬</Text>
-                <Text style={styles.chatEmptyText}>No messages yet</Text>
-                <Text style={styles.chatEmptySubtext}>Start the conversation with your team!</Text>
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 100 }}>
+                <Ionicons name="chatbubbles-outline" size={48} color="#333" />
+                <Text style={{ color: '#666', marginTop: 12 }}>No messages yet</Text>
               </View>
             ) : (
               messages.map(msg => {
                 const isMe = msg.senderId === myUid;
                 return (
                   <View key={msg.id} style={[styles.msgBubble, isMe ? styles.myBubble : styles.theirBubble]}>
-                    {!isMe && <Text style={styles.msgSender}>{msg.senderName}</Text>}
-                    <Text style={[styles.msgText, isMe && styles.myMsgText]}>{msg.text}</Text>
-                    <Text style={[styles.msgTime, isMe && styles.myMsgTime]}>
+                    {!isMe && <Text style={{ color: Colors.dark.tint, fontSize: 10, fontWeight: 'bold', marginBottom: 2 }}>{msg.senderName}</Text>}
+                    <Text style={[styles.msgText, isMe && { color: '#000' }]}>{msg.text}</Text>
+                    <Text style={{ color: isMe ? 'rgba(0,0,0,0.5)' : '#444', fontSize: 8, alignSelf: 'flex-end', marginTop: 2 }}>
                       {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </Text>
                   </View>
@@ -859,24 +556,10 @@ export default function MyTeamScreen() {
               })
             )}
           </ScrollView>
-
-          {/* Input */}
-          <View style={[styles.chatInputRow, { paddingBottom: insets.bottom + Spacing.sm }]}>
-            <TextInput
-              style={styles.chatInput}
-              value={chatText}
-              onChangeText={setChatText}
-              placeholder="Message your team..."
-              placeholderTextColor={Colors.dark.textSecondary}
-              multiline
-              maxLength={500}
-            />
-            <TouchableOpacity
-              style={[styles.chatSendBtn, (!chatText.trim() || sendingMsg) && { opacity: 0.4 }]}
-              onPress={sendMessage}
-              disabled={!chatText.trim() || sendingMsg}
-            >
-              <Text style={styles.chatSendBtnText}>→</Text>
+          <View style={[styles.chatInputRow, { paddingBottom: insets.bottom + 16 }]}>
+            <TextInput style={styles.chatInput} value={chatText} onChangeText={setChatText} placeholder="Type a message..." placeholderTextColor="#666" multiline />
+            <TouchableOpacity onPress={sendMessage} disabled={!chatText.trim() || sendingMsg} style={{ padding: 4 }}>
+              <Ionicons name="send" size={24} color={(!chatText.trim() || sendingMsg) ? '#333' : Colors.dark.tint} />
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -886,138 +569,52 @@ export default function MyTeamScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'transparent' },  
-  content: { padding: Spacing.lg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.dark.background },
-  pageTitle: { fontSize: FontSizes.xxl, fontWeight: FontWeights.bold, color: Colors.dark.text, marginBottom: Spacing.sm },
-  noTeamSubtitle: { color: Colors.dark.textSecondary, fontSize: FontSizes.md, marginBottom: Spacing.xl },
-  options: { gap: Spacing.md },
-  optionCard: { backgroundColor: Colors.dark.card, borderRadius: BorderRadius.md, padding: Spacing.lg, borderWidth: 1, borderColor: Colors.dark.border, gap: Spacing.sm },
-  optionTitle: { color: Colors.dark.text, fontSize: FontSizes.md, fontWeight: FontWeights.bold },
-  optionText: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm },
-  optionBtn: { backgroundColor: Colors.dark.tint, borderRadius: BorderRadius.md, padding: Spacing.sm, alignItems: 'center', marginTop: Spacing.xs },
-  optionBtnText: { color: '#000', fontWeight: FontWeights.bold, fontSize: FontSizes.sm },
-
-  // Team Header
-  teamHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.lg },
-  teamBadge: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center' },
-  teamBadgeText: { color: '#000', fontWeight: FontWeights.bold, fontSize: FontSizes.lg },
-  teamName: { color: Colors.dark.text, fontSize: FontSizes.lg, fontWeight: FontWeights.bold },
-  teamMeta: { color: Colors.dark.textSecondary, fontSize: FontSizes.xs, marginTop: 2 },
-  captainTag: { backgroundColor: Colors.dark.tint + '20', borderRadius: BorderRadius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 4, borderWidth: 1, borderColor: Colors.dark.tint },
-  captainTagText: { color: Colors.dark.tint, fontSize: FontSizes.xs, fontWeight: FontWeights.bold },
-  memberTag: { backgroundColor: Colors.dark.card, borderRadius: BorderRadius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 4, borderWidth: 1, borderColor: Colors.dark.border },
-  memberTagText: { color: Colors.dark.textSecondary, fontSize: FontSizes.xs },
+  container: { flex: 1 }, content: { padding: Spacing.lg }, center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#050505' },
+  pageTitle: { fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 8 }, noTeamSubtitle: { color: '#666', fontSize: 16, marginBottom: 24 },
+  options: { gap: 16 }, optionCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', gap: 16 },
+  optionTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' }, ctaBtn: { backgroundColor: Colors.dark.tint, borderRadius: 8, padding: 12, alignItems: 'center' }, ctaBtnText: { fontWeight: 'bold', color: '#000' },
+  headerGlass: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 20, padding: 16, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  teamBadge: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', position: 'relative' }, teamBadgeText: { fontWeight: 'bold', fontSize: 20, color: '#000' },
+  cameraIcon: { position: 'absolute', bottom: -2, right: -2, backgroundColor: '#FFF', borderRadius: 8, padding: 2, borderWidth: 1, borderColor: '#000' },
+  teamName: { color: '#fff', fontSize: 20, fontWeight: 'bold' }, teamMeta: { color: '#666', fontSize: 12, marginTop: 2 },
+  teamCodeBadge: { alignSelf: 'flex-start', backgroundColor: 'rgba(0,230,118,0.1)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 4, borderWidth: 1, borderColor: 'rgba(0,230,118,0.2)' }, teamCodeText: { color: Colors.dark.tint, fontSize: 10, fontWeight: 'bold', letterSpacing: 1 },
+  captainTag: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }, captainTagText: { color: Colors.dark.tint, fontSize: 12, fontWeight: 'bold' },
+  statsGridGlass: { flexDirection: 'row', gap: 8, marginBottom: 8 }, statBoxGlass: { flex: 1, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  statValue: { color: '#fff', fontSize: 18, fontWeight: 'bold' }, statLabel: { color: '#666', fontSize: 10, marginTop: 2 },
+  ratingRowGlass: { flexDirection: 'row', gap: 8, marginBottom: 20 }, ratingBoxGlass: { flex: 1, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  ratingLabel: { color: '#666', fontSize: 10 }, ratingValue: { color: '#fff', fontSize: 12, fontWeight: 'bold', marginTop: 2 },
+  actionBtns: { flexDirection: 'row', gap: 8, marginBottom: 24 }, actionBtnGlass: { flex: 1, backgroundColor: Colors.dark.tint, borderRadius: 12, padding: 12, alignItems: 'center', minWidth: '30%' },
+  actionBtnTextGlass: { fontWeight: 'bold', fontSize: 12, color: '#000' }, chatActionBtnGlass: { backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  addPlayerBtnGlass: { backgroundColor: 'rgba(0,230,118,0.1)', borderWidth: 1, borderColor: Colors.dark.tint },
+  section: { marginBottom: 24 }, sectionTitle: { color: '#aaa', fontSize: 12, fontWeight: 'bold', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },
+  glassContainer: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', overflow: 'hidden' },
+  playerRowGlass: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  playerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  playerAvatarText: { color: '#fff', fontSize: 14, fontWeight: 'bold' },
+  playerName: { color: '#fff', fontSize: 14, fontWeight: 'bold' }, playerIdText: { color: '#666', fontSize: 10 },
+  posBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1 }, posText: { fontSize: 10, fontWeight: 'bold' },
+  playerStatText: { color: '#666', fontSize: 10 }, playerAvatarImg: { width: 36, height: 36, borderRadius: 18 },
   teamLogoImg: { width: 56, height: 56, borderRadius: 28 },
-  logoEditHint: { position: 'absolute', bottom: -2, right: -2, backgroundColor: Colors.dark.card, borderRadius: 8, width: 16, height: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.dark.border },
-  logoEditHintText: { fontSize: 8 },
-  pickupBtnRow: { flexDirection: 'row', gap: 8, marginTop: 6 },
-  switchTeamBtn: { flex: 1, backgroundColor: '#4FC3F720', borderRadius: 6, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: '#4FC3F7' },
-  switchTeamBtnText: { color: '#4FC3F7', fontSize: 11, fontWeight: '700' },
-  deletePickupBtn: { flex: 1, backgroundColor: '#FF444415', borderRadius: 6, padding: 8, alignItems: 'center', borderWidth: 1, borderColor: '#FF444440' },
-  deletePickupBtnText: { color: '#FF4444', fontSize: 11, fontWeight: '700' },
-
-  // Stats
-  statsGrid: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm },
-  statBox: { flex: 1, backgroundColor: Colors.dark.card, borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center', borderWidth: 1, borderColor: Colors.dark.border },
-  statValue: { color: Colors.dark.text, fontSize: FontSizes.lg, fontWeight: FontWeights.bold },
-  statLabel: { color: Colors.dark.textSecondary, fontSize: FontSizes.xs, marginTop: 2 },
-  ratingRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.lg },
-  ratingBox: { flex: 1, backgroundColor: Colors.dark.card, borderRadius: BorderRadius.md, padding: Spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: Colors.dark.border },
-  ratingLabel: { color: Colors.dark.textSecondary, fontSize: FontSizes.xs },
-  ratingValue: { color: Colors.dark.text, fontSize: FontSizes.xs, fontWeight: FontWeights.bold, marginTop: 2, textAlign: 'center' },
-
-  // Action Buttons
-  actionBtns: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.lg, flexWrap: 'wrap' },
-  actionBtn: { flex: 1, backgroundColor: Colors.dark.tint, borderRadius: BorderRadius.md, padding: Spacing.sm, alignItems: 'center', minWidth: '30%' },
-  actionBtnText: { color: '#000', fontSize: FontSizes.sm, fontWeight: FontWeights.bold },
-  chatActionBtn: { backgroundColor: Colors.dark.card, borderWidth: 1, borderColor: Colors.dark.border },
-  chatActionBtnText: { color: Colors.dark.text, fontSize: FontSizes.sm, fontWeight: FontWeights.bold },
-  addPlayerBtn: { backgroundColor: Colors.dark.tint + '25', borderWidth: 1, borderColor: Colors.dark.tint },
-
-  // Add Player
-  addPlayerSection: { backgroundColor: Colors.dark.card, borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.dark.border, gap: Spacing.sm },
-  searchRow: { flexDirection: 'row', gap: Spacing.sm },
-  searchInput: { flex: 1, backgroundColor: Colors.dark.background, borderRadius: BorderRadius.md, padding: Spacing.md, color: Colors.dark.text, fontSize: FontSizes.sm, borderWidth: 1, borderColor: Colors.dark.border },
-  searchBtn: { backgroundColor: Colors.dark.tint, borderRadius: BorderRadius.md, paddingHorizontal: Spacing.md, justifyContent: 'center' },
-  searchBtnText: { color: '#000', fontWeight: FontWeights.bold, fontSize: FontSizes.sm },
-  searchResultCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.dark.background, borderRadius: BorderRadius.md, padding: Spacing.md, borderWidth: 1, borderColor: Colors.dark.tint },
-  searchResultInfo: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 },
-  searchResultAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.dark.tint, justifyContent: 'center', alignItems: 'center' },
-  searchResultAvatarText: { color: '#000', fontWeight: FontWeights.bold, fontSize: FontSizes.sm },
-  searchResultName: { color: Colors.dark.text, fontSize: FontSizes.sm, fontWeight: FontWeights.bold },
-  searchResultMeta: { color: Colors.dark.textSecondary, fontSize: FontSizes.xs },
-  searchResultId: { color: Colors.dark.tint, fontSize: FontSizes.xs },
-  addBtn: { backgroundColor: Colors.dark.tint, borderRadius: BorderRadius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
-  addBtnText: { color: '#000', fontWeight: FontWeights.bold, fontSize: FontSizes.sm },
-
-  // Squad
-  section: { marginBottom: Spacing.lg },
-  sectionTitle: { color: Colors.dark.text, fontSize: FontSizes.md, fontWeight: FontWeights.bold, marginBottom: Spacing.md },
-  playerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.dark.border },
-  playerNumber: { color: Colors.dark.textSecondary, fontSize: FontSizes.xs, width: 16 },
-  playerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.dark.card, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.dark.border },
-  playerAvatarText: { color: Colors.dark.text, fontSize: FontSizes.xs, fontWeight: FontWeights.bold },
-  playerNameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  playerName: { color: Colors.dark.text, fontSize: FontSizes.sm, fontWeight: FontWeights.semibold, flexShrink: 1 },
-  playerIdText: { color: Colors.dark.textSecondary, fontSize: 10 },
-  captainBadge: { backgroundColor: Colors.dark.tint, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1 },
-  captainBadgeText: { color: '#000', fontSize: 9, fontWeight: FontWeights.bold },
-  posBadge: { paddingHorizontal: Spacing.xs, paddingVertical: 2, borderRadius: BorderRadius.sm, borderWidth: 1 },
-  posText: { fontSize: FontSizes.xs, fontWeight: FontWeights.bold },
-  playerStats: { gap: 2, alignItems: 'flex-end' },
-  playerStatText: { color: Colors.dark.textSecondary, fontSize: 10 },
-  moreBtn: { padding: Spacing.xs },
-  moreBtnText: { color: Colors.dark.textSecondary, fontSize: FontSizes.md, letterSpacing: 1 },
-  emptyText: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm },
-  playerAvatarImg: { width: 36, height: 36, borderRadius: 18 },
-
-  // Modal
-  modalWrapper: { flex: 1, backgroundColor: Colors.dark.background },
-  modalContent: { padding: Spacing.lg, paddingBottom: 60, paddingTop: Spacing.xl },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xl },
-  modalTitle: { color: Colors.dark.text, fontSize: FontSizes.xl, fontWeight: FontWeights.bold },
-  modalClose: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm },
-  inputLabel: { color: Colors.dark.textSecondary, fontSize: FontSizes.xs, fontWeight: FontWeights.semibold, marginTop: Spacing.md, marginBottom: Spacing.xs, textTransform: 'uppercase' },
-  input: { backgroundColor: Colors.dark.card, borderRadius: BorderRadius.md, padding: Spacing.md, color: Colors.dark.text, fontSize: FontSizes.md, borderWidth: 1, borderColor: Colors.dark.border },
-  colorRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm },
-  colorDot: { width: 36, height: 36, borderRadius: 18 },
-  colorDotSelected: { borderWidth: 3, borderColor: Colors.dark.text },
-  optionRow: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap', marginBottom: Spacing.sm },
-  optionBtnActive: { borderColor: Colors.dark.tint, backgroundColor: Colors.dark.tint + '20' },
-  optionText: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm },
-  optionTextActive: { color: Colors.dark.tint, fontWeight: FontWeights.bold },
-  saveBtn: { backgroundColor: Colors.dark.tint, borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center', marginTop: Spacing.xl },
-  saveBtnText: { color: '#000', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
-  convertPickupBtn: { backgroundColor: '#4FC3F720', borderRadius: BorderRadius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 4, borderWidth: 1, borderColor: '#4FC3F7', marginTop: 4 },
-  convertPickupBtnText: { color: '#4FC3F7', fontSize: FontSizes.xs, fontWeight: FontWeights.bold },
-  pickupWarning: { backgroundColor: '#FFC10715', borderRadius: BorderRadius.md, padding: Spacing.sm, marginBottom: Spacing.md, borderWidth: 1, borderColor: '#FFC10740' },
-  pickupWarningText: { color: '#FFC107', fontSize: FontSizes.xs, textAlign: 'center' },
-
-  // Chat
-  chatHeader: { backgroundColor: Colors.dark.card, flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.dark.border },
-  chatBackText: { color: Colors.dark.tint, fontSize: FontSizes.xl },
-  chatHeaderInfo: { flex: 1 },
-  chatHeaderTitle: { color: Colors.dark.text, fontSize: FontSizes.md, fontWeight: FontWeights.bold },
-  chatHeaderSub: { color: Colors.dark.textSecondary, fontSize: FontSizes.xs },
-  chatMessages: { flex: 1 },
-  chatMessagesContent: { padding: Spacing.md, gap: Spacing.sm, paddingBottom: Spacing.xl },
-  chatEmpty: { alignItems: 'center', marginTop: 80, gap: Spacing.md },
-  chatEmptyIcon: { fontSize: 48 },
-  chatEmptyText: { color: Colors.dark.text, fontSize: FontSizes.lg, fontWeight: FontWeights.bold },
-  chatEmptySubtext: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm, textAlign: 'center' },
-  msgBubble: { maxWidth: '75%', padding: Spacing.sm, borderRadius: BorderRadius.md, gap: 2 },
-  myBubble: { alignSelf: 'flex-end', backgroundColor: Colors.dark.tint },
-  theirBubble: { alignSelf: 'flex-start', backgroundColor: Colors.dark.card, borderWidth: 1, borderColor: Colors.dark.border },
-  msgSender: { color: Colors.dark.textSecondary, fontSize: FontSizes.xs, fontWeight: FontWeights.semibold },
-  msgText: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm },
-  myMsgText: { color: '#000' },
-  msgTime: { color: Colors.dark.textSecondary, fontSize: 10, alignSelf: 'flex-end' },
-  myMsgTime: { color: '#00000080' },
-  chatInputRow: { flexDirection: 'row', gap: Spacing.sm, padding: Spacing.md, backgroundColor: Colors.dark.card, borderTopWidth: 1, borderTopColor: Colors.dark.border, alignItems: 'flex-end' },
-  chatInput: { flex: 1, backgroundColor: Colors.dark.background, borderRadius: BorderRadius.md, padding: Spacing.sm, color: Colors.dark.text, fontSize: FontSizes.md, borderWidth: 1, borderColor: Colors.dark.border, maxHeight: 100 },
-  chatSendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.dark.tint, justifyContent: 'center', alignItems: 'center' },
-  chatSendBtnText: { color: '#000', fontSize: FontSizes.lg, fontWeight: FontWeights.bold },
-  teamCode: { color: Colors.dark.tint, fontSize: FontSizes.xs, fontWeight: FontWeights.bold, letterSpacing: 1, marginTop: 2 },
-
+  chatActionBtnTextGlass: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
+  msgText: { color: Colors.dark.textSecondary, fontSize: 14 },
+  switchBanner: { backgroundColor: 'rgba(79,195,247,0.1)', borderRadius: 8, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(79,195,247,0.3)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  switchBannerText: { color: '#4FC3F7', fontSize: 12, fontWeight: 'bold' }, switchBannerAction: { color: '#4FC3F7', fontSize: 12, fontWeight: 'bold' },
+  requestActions: { flexDirection: 'row', gap: 8 }, approveBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.dark.tint, justifyContent: 'center', alignItems: 'center' },
+  denyBtn: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: '#FF4444', justifyContent: 'center', alignItems: 'center' },
+  modalWrapper: { flex: 1, backgroundColor: '#050505' }, modalContent: { padding: 20 }, modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }, modalTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' }, modalClose: { color: '#666' },
+  inputLabel: { color: '#666', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, marginTop: 16 }, input: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 12, color: '#fff', fontSize: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  saveBtn: { backgroundColor: Colors.dark.tint, borderRadius: 8, padding: 16, alignItems: 'center', marginTop: 32 }, saveBtnText: { fontWeight: 'bold', color: '#000' },
+  chatHeader: { backgroundColor: 'rgba(255,255,255,0.03)', flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  msgBubble: { maxWidth: '80%', padding: 12, borderRadius: 12, marginBottom: 8 }, myBubble: { alignSelf: 'flex-end', backgroundColor: Colors.dark.tint }, theirBubble: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  chatInputRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, backgroundColor: 'rgba(255,255,255,0.03)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }, chatInput: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 8, padding: 12, color: '#fff', maxHeight: 100 },
+  colorRow: { flexDirection: 'row', gap: 12, marginBottom: 8 }, colorDot: { width: 32, height: 32, borderRadius: 16 },
+  addPlayerSectionGlass: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: 'rgba(0,230,118,0.2)' },
+  searchRow: { flexDirection: 'row', gap: 12 }, searchInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 12, color: '#fff' },
+  searchBtn: { backgroundColor: Colors.dark.tint, borderRadius: 8, paddingHorizontal: 16, justifyContent: 'center' },
+  searchResultCard: { flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: 'rgba(255,255,255,0.05)', padding: 12, borderRadius: 8, gap: 12 }, addBtn: { backgroundColor: Colors.dark.tint, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 6 }, addBtnText: { fontSize: 12, fontWeight: 'bold', color: '#000' },
+  optionRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  optionBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  optionBtnActive: { backgroundColor: Colors.dark.tint + '20', borderColor: Colors.dark.tint },
+  optionText: { color: '#666', fontSize: 12, fontWeight: 'bold' },
+  optionTextActive: { color: Colors.dark.tint },
 });

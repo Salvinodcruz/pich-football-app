@@ -11,7 +11,8 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
-import ChevronBackground from '@/src/components/ChevronBackground';
+import PremiumBackground from '@/src/components/PremiumBackground';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function MessagesScreen() {
   const insets = useSafeAreaInsets();
@@ -19,7 +20,6 @@ export default function MessagesScreen() {
   const [loading, setLoading] = useState(true);
   const [chats, setChats] = useState<any[]>([]);
 
-  // ✅ useFocusEffect is at component level — correct
   useFocusEffect(useCallback(() => {
     setLoading(true);
     loadChats();
@@ -54,7 +54,6 @@ export default function MessagesScreen() {
               );
               const lastMsg = msgSnap.docs[0]?.data();
 
-              // Get opponent captain name
               let captainName = opponentName || 'Opponent';
               try {
                 const oppTeamId = isFrom ? match.toTeamId : match.fromTeamId;
@@ -71,11 +70,12 @@ export default function MessagesScreen() {
                 id: match.id,
                 type: 'captain',
                 name: captainName,
-                subtitle: `⚽ ${opponentName} · ${match.date || ''}`,
+                subtitle: `${opponentName} · ${match.date || ''}`,
                 lastMessage: lastMsg?.text || 'No messages yet',
                 lastTime: lastMsg?.createdAt || match.createdAt || '',
                 unread: (msgSnap.docs || []).filter(d => !d.data().read && d.data().senderId !== user.uid).length,
                 color: isFrom ? (match.toTeamColor || Colors.dark.tint) : (match.fromTeamColor || Colors.dark.tint),
+                icon: 'football-outline',
               });
             } catch (e) { console.error('match chat error', e); }
           }
@@ -96,7 +96,6 @@ export default function MessagesScreen() {
               const otherTeamDoc = await getDoc(doc(db, 'teams', otherTeamId));
               const otherTeam = otherTeamDoc.data();
 
-              // Get other team captain name
               let captainName = otherTeam?.name || 'Team';
               try {
                 const captainId = otherTeam?.captainId;
@@ -115,18 +114,19 @@ export default function MessagesScreen() {
                 id: d.id,
                 type: 'direct',
                 name: captainName,
-                subtitle: `💬 ${otherTeam?.name || 'Team'} · Direct`,
+                subtitle: `${otherTeam?.name || 'Team'} · Direct`,
                 lastMessage: lastMsg?.text || 'No messages yet',
                 lastTime: lastMsg?.createdAt || data.createdAt || '',
                 unread: (msgSnap.docs || []).filter(d => !d.data().read && d.data().senderId !== teamId).length,
                 color: otherTeam?.color || Colors.dark.tint,
                 logoURL: otherTeam?.logoURL,
+                icon: 'chatbubble-outline',
               });
             } catch (e) { console.error('direct chat error', e); }
           }
         } catch (e) { console.error('directChats error', e); }
 
-        // 3. Team chat - show captain name with team name as subtitle
+        // 3. Team chat
         try {
           const teamDoc = await getDoc(doc(db, 'teams', teamId));
           const teamData = teamDoc.data();
@@ -135,7 +135,6 @@ export default function MessagesScreen() {
           );
           const lastTeamMsg = teamMsgSnap.docs[0]?.data();
 
-          // Get team captain name
           let captainName = teamData?.name || 'Team';
           try {
             const captainId = teamData?.captainId;
@@ -150,12 +149,13 @@ export default function MessagesScreen() {
             id: teamId,
             type: 'team',
             name: captainName,
-            subtitle: `👥 ${teamData?.name || 'Team'} · ${(teamData?.players || []).length} players`,
+            subtitle: `${teamData?.name || 'Team'} · ${(teamData?.players || []).length} players`,
             lastMessage: lastTeamMsg?.text || 'No messages yet',
             lastTime: lastTeamMsg?.createdAt || '',
             unread: 0,
             color: teamData?.color || Colors.dark.tint,
             logoURL: teamData?.logoURL,
+            icon: 'people-outline',
           });
         } catch (e) { console.error('team chat error', e); }
 
@@ -176,13 +176,14 @@ export default function MessagesScreen() {
                   id: dmId,
                   type: 'friend',
                   name: friendName,
-                  subtitle: `🤝 Friend · Direct Message`,
+                  subtitle: `Friend · Direct Message`,
                   lastMessage: lastMsg.text || '',
                   lastTime: lastMsg.createdAt || '',
                   unread: (msgSnap.docs || []).filter(d => !d.data().read && d.data().senderId !== user.uid).length,
                   color: '#4FC3F7',
                   photoURL: friend.photoURL,
                   friendId: friend.id,
+                  icon: 'person-outline',
                 });
               }
             } catch (e) { console.error('friend dm error', e); }
@@ -190,7 +191,6 @@ export default function MessagesScreen() {
         } catch (e) { console.error('friends error', e); }
       }
 
-      // ✅ Sort at the END after all chats are collected
       allChats.sort((a, b) => {
         if (!a.lastTime) return 1;
         if (!b.lastTime) return -1;
@@ -207,25 +207,13 @@ export default function MessagesScreen() {
 
   const openChat = (chat: any) => {
     if (chat.type === 'team') {
-      router.push({
-        pathname: `/chat-team/${chat.id}`,
-        params: { teamName: chat.name }
-      });
+      router.push({ pathname: `/chat-team/[id]`, params: { id: chat.id, teamName: chat.name } });
     } else if (chat.type === 'captain') {
-      router.push({
-        pathname: `/chat/${chat.id}`,
-        params: { opponentName: chat.name }
-      });
+      router.push({ pathname: `/chat/[id]`, params: { id: chat.id, opponentName: chat.name } });
     } else if (chat.type === 'direct') {
-      router.push({
-        pathname: `/direct-chat/${chat.id}`,
-        params: { chatName: chat.name }
-      });
+      router.push({ pathname: `/direct-chat/[id]`, params: { id: chat.id, chatName: chat.name } });
     } else if (chat.type === 'friend') {
-      router.push({
-        pathname: `/friend-dm/${chat.id}`,
-        params: { friendName: chat.name }
-      });
+      router.push({ pathname: `/friend-dm/[id]`, params: { id: chat.id, friendName: chat.name } });
     }
   };
 
@@ -249,17 +237,21 @@ export default function MessagesScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
-      <ChevronBackground />
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
       <ScrollView
         style={{ flex: 1, backgroundColor: 'transparent' }}
         contentContainerStyle={[styles.content, {
           paddingTop: insets.top + Spacing.md,
           paddingBottom: insets.bottom + 40,
         }]}
+        showsVerticalScrollIndicator={false}
       >
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="arrow-back" size={20} color={Colors.dark.tint} />
+            <Text style={styles.backText}>Back</Text>
+          </View>
         </TouchableOpacity>
 
         <Text style={styles.pageTitle}>Messages</Text>
@@ -267,13 +259,13 @@ export default function MessagesScreen() {
         {/* Legend */}
         <View style={styles.legend}>
           {[
-            { color: Colors.dark.tint, label: 'Match' },
-            { color: '#4FC3F7', label: 'Team' },
-            { color: '#FFC107', label: 'Direct' },
-            { color: '#4ff787', label: 'Friend' },
+            { color: Colors.dark.tint, label: 'Match', icon: 'football' },
+            { color: '#4FC3F7', label: 'Team', icon: 'people' },
+            { color: '#FFC107', label: 'Direct', icon: 'chatbubble' },
+            { color: '#4ff787', label: 'Friend', icon: 'person' },
           ].map(item => (
             <View key={item.label} style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: item.color }]} />
+              <Ionicons name={item.icon as any} size={10} color={item.color} />
               <Text style={styles.legendText}>{item.label}</Text>
             </View>
           ))}
@@ -283,7 +275,7 @@ export default function MessagesScreen() {
           <ActivityIndicator size="large" color={Colors.dark.tint} style={{ marginTop: 40 }} />
         ) : chats.length === 0 ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>💬</Text>
+            <Ionicons name="chatbubbles-outline" size={48} color="#333" />
             <Text style={styles.emptyTitle}>No messages yet</Text>
             <Text style={styles.emptySubtext}>
               Accept a challenge or message a team captain to start chatting
@@ -328,7 +320,10 @@ export default function MessagesScreen() {
                       </View>
                     )}
                   </View>
-                  <Text style={styles.chatSubtitle} numberOfLines={1}>{chat.subtitle}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                    <Ionicons name={chat.icon as any} size={10} color="#444" />
+                    <Text style={styles.chatSubtitle} numberOfLines={1}>{chat.subtitle}</Text>
+                  </View>
                 </View>
               </TouchableOpacity>
             ))}
@@ -346,15 +341,14 @@ const styles = StyleSheet.create({
   pageTitle: { fontSize: FontSizes.xxl, fontWeight: FontWeights.bold, color: '#fff', marginBottom: Spacing.md },
   legend: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.lg },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { color: '#666', fontSize: FontSizes.xs },
+  legendText: { color: '#666', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase' },
   chatList: { gap: Spacing.xs },
-  chatRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: BorderRadius.md, backgroundColor: '#141414CC', borderWidth: 1, borderColor: '#2A2A2A' },
+  chatRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: BorderRadius.md, backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   avatarWrapper: { position: 'relative', flexShrink: 0 },
   chatAvatar: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
   chatAvatarImg: { width: 50, height: 50, borderRadius: 25 },
   chatAvatarText: { color: '#000', fontWeight: FontWeights.bold, fontSize: FontSizes.sm },
-  chatTypeDot: { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: '#141414' },
+  chatTypeDot: { position: 'absolute', bottom: 0, right: 0, width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: '#050505' },
   chatContent: { flex: 1, minWidth: 0 },
   chatTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
   chatName: { color: '#aaa', fontSize: FontSizes.sm, fontWeight: FontWeights.semibold, flex: 1 },
@@ -363,11 +357,11 @@ const styles = StyleSheet.create({
   chatBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chatLastMsg: { color: '#555', fontSize: FontSizes.xs, flex: 1 },
   chatLastMsgUnread: { color: '#aaa', fontWeight: FontWeights.semibold },
-  chatSubtitle: { color: '#444', fontSize: 10, marginTop: 2 },
+  chatSubtitle: { color: '#444', fontSize: 10 },
   unreadBadge: { backgroundColor: Colors.dark.tint, borderRadius: 8, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4, marginLeft: 4 },
   unreadBadgeText: { color: '#000', fontSize: 9, fontWeight: FontWeights.bold },
   empty: { alignItems: 'center', marginTop: 80, gap: Spacing.md },
-  emptyIcon: { fontSize: 56 },
+  emptyIcon: { fontSize: 48 },
   emptyTitle: { color: '#fff', fontSize: FontSizes.lg, fontWeight: FontWeights.bold },
   emptySubtext: { color: '#666', fontSize: FontSizes.sm, textAlign: 'center', lineHeight: 20 },
 });

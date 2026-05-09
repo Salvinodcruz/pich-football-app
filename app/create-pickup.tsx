@@ -8,8 +8,9 @@ import { useRouter } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
-import ChevronBackground from '@/src/components/ChevronBackground';
+import PremiumBackground from '@/src/components/PremiumBackground';
 import { getFriends, createPickupTeam } from '@/src/utils/friendsService';
+import { Ionicons } from '@expo/vector-icons';
 
 const FORMATS = ['5-a-side', '7-a-side', '11-a-side'];
 const EMIRATES = ['Sharjah', 'Dubai', 'Ajman'];
@@ -35,9 +36,6 @@ export default function CreatePickupScreen() {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const userData = userDoc.data();
       setMyProfile({ id: user.uid, ...userData });
-
-
-
       const f = await getFriends(user.uid);
       setFriends(f);
     } catch (e) {
@@ -69,13 +67,13 @@ export default function CreatePickupScreen() {
       const user = auth.currentUser;
       if (!user) return;
       const name = `${myProfile.firstName || ''} ${myProfile.lastName || ''}`.trim() || 'Captain';
-      const teamId = await createPickupTeam(
+      await createPickupTeam(
         user.uid, name, teamName.trim(),
         selectedFriends, format, emirate
       );
       Alert.alert(
-        '⚡ Pickup Team Created!',
-        `${teamName} is ready!\n\nThis team auto-deletes 48hrs after creation.\nYou can convert it to permanent anytime.`,
+        'Pickup Team Created!',
+        `${teamName} is ready!\n\nThis team auto-deletes 48hrs after creation.`,
         [{ text: 'Let\'s Go!', onPress: () => router.replace('/(tabs)/my-team') }]
       );
     } catch (e) {
@@ -87,26 +85,34 @@ export default function CreatePickupScreen() {
   };
 
   if (loading) return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A', justifyContent: 'center', alignItems: 'center' }}>
-      <ChevronBackground />
+    <View style={{ flex: 1, backgroundColor: '#050505', justifyContent: 'center', alignItems: 'center' }}>
+      <PremiumBackground />
       <ActivityIndicator size="large" color={Colors.dark.tint} />
     </View>
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
-      <ChevronBackground />
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
       <ScrollView
         style={{ flex: 1, backgroundColor: 'transparent' }}
         contentContainerStyle={[styles.content, {
           paddingTop: insets.top + Spacing.md,
           paddingBottom: insets.bottom + 40,
         }]}
+        showsVerticalScrollIndicator={false}
       >
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="arrow-back" size={20} color={Colors.dark.tint} />
+            <Text style={styles.backText}>Back</Text>
+          </View>
         </TouchableOpacity>
-        <Text style={styles.pageTitle}>⚡ Create Pickup Game</Text>
+        
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <Ionicons name="flash" size={24} color={Colors.dark.tint} />
+          <Text style={styles.pageTitle}>Create Pickup Game</Text>
+        </View>
         <Text style={styles.subtitle}>Temporary team with friends — auto-deletes after 48hrs</Text>
 
         {/* Team Name */}
@@ -130,7 +136,10 @@ export default function CreatePickupScreen() {
             <View style={styles.stepNum}><Text style={styles.stepNumText}>2</Text></View>
             <Text style={styles.stepTitle}>Format & Emirate</Text>
           </View>
-          <Text style={styles.label}>Format</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm }}>
+            <Ionicons name="football-outline" size={14} color="#aaa" />
+            <Text style={styles.label}>Format</Text>
+          </View>
           <View style={styles.optionRow}>
             {FORMATS.map(f => (
               <TouchableOpacity
@@ -142,7 +151,10 @@ export default function CreatePickupScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={[styles.label, { marginTop: Spacing.sm }]}>Emirate</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.md, marginBottom: Spacing.sm }}>
+            <Ionicons name="location-outline" size={14} color="#aaa" />
+            <Text style={styles.label}>Emirate</Text>
+          </View>
           <View style={styles.optionRow}>
             {EMIRATES.map(e => (
               <TouchableOpacity
@@ -163,7 +175,10 @@ export default function CreatePickupScreen() {
             <Text style={styles.stepTitle}>Select Friends ({selectedFriends.length} selected)</Text>
           </View>
           {friends.length === 0 ? (
-            <Text style={styles.noFriends}>No friends yet. Add friends first!</Text>
+            <View style={{ alignItems: 'center', padding: Spacing.md }}>
+               <Ionicons name="people-outline" size={32} color="#333" style={{ marginBottom: 8 }} />
+               <Text style={styles.noFriends}>No friends yet. Add friends first!</Text>
+            </View>
           ) : (
             friends.map(friend => {
               const name = `${friend.firstName || ''} ${friend.lastName || ''}`.trim() || friend.name || 'Player';
@@ -186,7 +201,7 @@ export default function CreatePickupScreen() {
                     <Text style={styles.friendMeta}>{friend.position} · {friend.emirate}</Text>
                   </View>
                   <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
-                    {selected && <Text style={styles.checkmark}>✓</Text>}
+                    {selected && <Ionicons name="checkmark" size={12} color="#000" />}
                   </View>
                 </TouchableOpacity>
               );
@@ -196,11 +211,14 @@ export default function CreatePickupScreen() {
 
         {/* Info */}
         <View style={styles.infoCard}>
-          <Text style={styles.infoText}>
-            ⚡ Pickup teams are temporary — they auto-delete after 48hrs.{'\n'}
-            📊 Player stats (goals, assists) are kept even after deletion.{'\n'}
-            🔄 You can convert to a permanent team anytime from My Team.
-          </Text>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <Ionicons name="information-circle-outline" size={20} color={Colors.dark.tint} />
+            <Text style={styles.infoText}>
+              Pickup teams are temporary — they auto-delete after 48hrs.{'\n'}
+              Player stats (goals, assists) are kept even after deletion.{'\n'}
+              You can convert to a permanent team anytime from My Team.
+            </Text>
+          </View>
         </View>
 
         <TouchableOpacity
@@ -210,7 +228,10 @@ export default function CreatePickupScreen() {
         >
           {creating
             ? <ActivityIndicator color="#000" />
-            : <Text style={styles.createBtnText}>⚡ Create Pickup Team</Text>
+            : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="flash" size={18} color="#000" />
+                <Text style={styles.createBtnText}>Create Pickup Team</Text>
+              </View>
           }
         </TouchableOpacity>
       </ScrollView>
@@ -222,21 +243,21 @@ const styles = StyleSheet.create({
   content: { padding: Spacing.lg },
   backBtn: { marginBottom: Spacing.md },
   backText: { color: Colors.dark.tint, fontSize: FontSizes.md, fontWeight: FontWeights.semibold },
-  pageTitle: { fontSize: FontSizes.xxl, fontWeight: FontWeights.bold, color: '#fff', marginBottom: 4 },
+  pageTitle: { fontSize: FontSizes.xxl, fontWeight: FontWeights.bold, color: '#fff' },
   subtitle: { color: '#666', fontSize: FontSizes.sm, marginBottom: Spacing.lg },
-  stepCard: { backgroundColor: '#141414CC', borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.md, borderWidth: 1, borderColor: '#2A2A2A' },
+  stepCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: Spacing.md, marginBottom: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   stepHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md },
   stepNum: { width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.dark.tint, justifyContent: 'center', alignItems: 'center' },
   stepNumText: { color: '#000', fontSize: FontSizes.xs, fontWeight: FontWeights.bold },
   stepTitle: { color: '#fff', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
-  input: { backgroundColor: '#0A0A0A', borderRadius: BorderRadius.md, padding: Spacing.md, color: '#fff', fontSize: FontSizes.md, borderWidth: 1, borderColor: '#2A2A2A' },
-  label: { color: '#aaa', fontSize: FontSizes.xs, fontWeight: FontWeights.semibold, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: Spacing.sm },
+  input: { backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: BorderRadius.md, padding: Spacing.md, color: '#fff', fontSize: FontSizes.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  label: { color: '#aaa', fontSize: FontSizes.xs, fontWeight: FontWeights.semibold, textTransform: 'uppercase', letterSpacing: 0.5 },
   optionRow: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' },
-  optionBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: '#2A2A2A', backgroundColor: '#1A1A1A' },
+  optionBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.03)' },
   optionBtnActive: { borderColor: Colors.dark.tint, backgroundColor: Colors.dark.tint + '20' },
   optionText: { color: '#666', fontSize: FontSizes.sm },
   optionTextActive: { color: Colors.dark.tint, fontWeight: FontWeights.semibold },
-  friendRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.sm, borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: '#2A2A2A', marginBottom: 6 },
+  friendRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.sm, borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginBottom: 6, backgroundColor: 'rgba(255,255,255,0.01)' },
   friendRowSelected: { borderColor: Colors.dark.tint, backgroundColor: Colors.dark.tint + '10' },
   friendAvatar: { width: 36, height: 36, borderRadius: 18 },
   friendAvatarPlaceholder: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
@@ -245,12 +266,11 @@ const styles = StyleSheet.create({
   friendName: { color: '#aaa', fontSize: FontSizes.sm, fontWeight: FontWeights.semibold },
   friendNameSelected: { color: '#fff' },
   friendMeta: { color: '#555', fontSize: FontSizes.xs },
-  checkbox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#2A2A2A', justifyContent: 'center', alignItems: 'center' },
+  checkbox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
   checkboxSelected: { backgroundColor: Colors.dark.tint, borderColor: Colors.dark.tint },
-  checkmark: { color: '#000', fontSize: 12, fontWeight: FontWeights.bold },
-  noFriends: { color: '#666', fontSize: FontSizes.sm, textAlign: 'center', padding: Spacing.md },
-  infoCard: { backgroundColor: '#141414CC', borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.md, borderWidth: 1, borderColor: '#2A2A2A' },
-  infoText: { color: '#666', fontSize: FontSizes.sm, lineHeight: 22 },
+  noFriends: { color: '#666', fontSize: FontSizes.sm, textAlign: 'center' },
+  infoCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: Spacing.md, marginBottom: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  infoText: { color: '#666', fontSize: FontSizes.sm, lineHeight: 22, flex: 1 },
   createBtn: { backgroundColor: Colors.dark.tint, borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center' },
   createBtnText: { color: '#000', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
 });

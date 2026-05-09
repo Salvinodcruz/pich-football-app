@@ -8,7 +8,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
-import ChevronBackground from '@/src/components/ChevronBackground';
+import PremiumBackground from '@/src/components/PremiumBackground';
+import { Ionicons } from '@expo/vector-icons';
 
 const VENUES_BY_EMIRATE: Record<string, string[]> = {
   Sharjah: ['Falcon Sports - Al Majaz, SHJ', 'Al Wahda Sports Club, SHJ', 'Sharjah Club Ground, SHJ', 'Sharjah Stadium Area, SHJ'],
@@ -113,7 +114,7 @@ export default function EditMatchScreen() {
         });
       }
 
-      Alert.alert('✅ Match Updated!', 'The other captain has been notified.', [
+      Alert.alert('Match Updated!', 'The other captain has been notified.', [
         { text: 'OK', onPress: () => router.back() }
       ]);
     } catch (e) {
@@ -127,17 +128,21 @@ export default function EditMatchScreen() {
 
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
-      <ChevronBackground />
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
       <ScrollView
         style={{ flex: 1, backgroundColor: 'transparent' }}
         contentContainerStyle={[styles.content, {
           paddingTop: insets.top + Spacing.md,
           paddingBottom: insets.bottom + 40,
         }]}
+        showsVerticalScrollIndicator={false}
       >
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="arrow-back" size={20} color={Colors.dark.tint} />
+            <Text style={styles.backText}>Back</Text>
+          </View>
         </TouchableOpacity>
         <Text style={styles.pageTitle}>Edit Match Details</Text>
         <Text style={styles.subtitle}>Changes will notify the other captain</Text>
@@ -149,9 +154,9 @@ export default function EditMatchScreen() {
             <Text style={styles.stepTitle}>Date</Text>
           </View>
           <TouchableOpacity style={styles.pickerTrigger} onPress={() => setShowDatePicker(true)}>
-            <Text style={styles.pickerTriggerIcon}>📅</Text>
+            <Ionicons name="calendar-outline" size={18} color={Colors.dark.tint} />
             <Text style={styles.pickerTriggerText}>{dateString}</Text>
-            <Text style={styles.pickerTriggerArrow}>▾</Text>
+            <Ionicons name="chevron-down" size={16} color={Colors.dark.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -162,9 +167,9 @@ export default function EditMatchScreen() {
             <Text style={styles.stepTitle}>Time</Text>
           </View>
           <TouchableOpacity style={styles.pickerTrigger} onPress={() => setShowTimePicker(true)}>
-            <Text style={styles.pickerTriggerIcon}>🕐</Text>
+            <Ionicons name="time-outline" size={18} color={Colors.dark.tint} />
             <Text style={styles.pickerTriggerText}>{timeString}</Text>
-            <Text style={styles.pickerTriggerArrow}>▾</Text>
+            <Ionicons name="chevron-down" size={16} color={Colors.dark.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -192,9 +197,9 @@ export default function EditMatchScreen() {
                 style={[styles.venueRow, venue === v && styles.venueRowActive]}
                 onPress={() => setVenue(v)}
               >
-                <Text style={styles.venuePin}>📍</Text>
+                <Ionicons name="location-outline" size={14} color={venue === v ? Colors.dark.tint : Colors.dark.textSecondary} />
                 <Text style={[styles.venueText, venue === v && styles.venueTextActive]} numberOfLines={1}>{v}</Text>
-                {venue === v && <Text style={styles.venueCheck}>✓</Text>}
+                {venue === v && <Ionicons name="checkmark-circle" size={16} color={Colors.dark.tint} />}
               </TouchableOpacity>
             ))}
           </View>
@@ -224,7 +229,12 @@ export default function EditMatchScreen() {
               <View style={styles.pickerCol}><Text style={styles.pickerColLabel}>Month</Text><ScrollPicker items={MONTHS} selected={month} onSelect={setMonth} /></View>
               <View style={styles.pickerCol}><Text style={styles.pickerColLabel}>Year</Text><ScrollPicker items={YEARS} selected={year} onSelect={setYear} /></View>
             </View>
-            <View style={styles.pickerPreview}><Text style={styles.pickerPreviewText}>📅 {dateString}</Text></View>
+            <View style={styles.pickerPreview}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="calendar" size={18} color={Colors.dark.tint} />
+                <Text style={styles.pickerPreviewText}>{dateString}</Text>
+              </View>
+            </View>
           </View>
         </View>
       </Modal>
@@ -244,7 +254,12 @@ export default function EditMatchScreen() {
               <View style={styles.pickerCol}><Text style={styles.pickerColLabel}>Min</Text><ScrollPicker items={MINUTES} selected={minute} onSelect={setMinute} /></View>
               <View style={styles.pickerCol}><Text style={styles.pickerColLabel}>AM/PM</Text><ScrollPicker items={PERIODS} selected={period} onSelect={setPeriod} /></View>
             </View>
-            <View style={styles.pickerPreview}><Text style={styles.pickerPreviewText}>🕐 {timeString}</Text></View>
+            <View style={styles.pickerPreview}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="time" size={18} color={Colors.dark.tint} />
+                <Text style={styles.pickerPreviewText}>{timeString}</Text>
+              </View>
+            </View>
           </View>
         </View>
       </Modal>

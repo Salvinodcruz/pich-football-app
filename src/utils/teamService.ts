@@ -37,6 +37,7 @@ export const createTeam = async (
   // Update user's teamId
   await updateDoc(doc(db, 'users', userId), {
     teamId: docRef.id,
+    isFreeAgent: false,
   });
 
   return docRef.id;
@@ -78,7 +79,77 @@ export const addPlayerToTeam = async (teamId: string, userId: string): Promise<v
       });
       await updateDoc(doc(db, 'users', userId), {
         teamId: teamId,
+        isFreeAgent: false,
       });
     }
+  }
+};
+
+// Request to join a team
+export const requestToJoinTeam = async (teamId: string, userId: string, userName: string): Promise<void> => {
+  const q = query(
+    collection(db, 'teamJoinRequests'),
+    where('teamId', '==', teamId),
+    where('userId', '==', userId),
+    where('status', '==', 'pending')
+  );
+  const snap = await getDocs(q);
+  if (!snap.empty) throw new Error('Request already pending');
+
+  await addDoc(collection(db, 'teamJoinRequests'), {
+    teamId,
+    userId,
+    userName,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  });
+
+  // Notify captain
+  const teamDoc = await getDoc(doc(db, 'teams', teamId));
+  const captainId = teamDoc.data()?.captainId;
+  if (captainId) {
+    await addDoc(collection(db, 'notifications'), {
+      type: 'join_request',
+      toUserId: captainId,
+      fromUserName: userName,
+      teamId,
+      teamName: teamDoc.data()?.name,
+      createdAt: new Date().toISOString(),
+      read: false,
+    });
+  }
+};
+
+// Get pending join requests for a team
+export const getPendingJoinRequests = async (teamId: string): Promise<any[]> => {
+  const q = query(
+    collection(db, 'teamJoinRequests'),
+    where('teamId', '==', teamId),
+    where('status', '==', 'pending')
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+};
+
+// Respond to join request
+export const respondToJoinRequest = async (requestId: string, approve: boolean): Promise<void> => {
+  const reqDoc = await getDoc(doc(db, 'teamJoinRequests', requestId));
+  if (!reqDoc.exists()) return;
+  const data = reqDoc.data();
+
+  if (approve) {
+    await addPlayerToTeam(data.teamId, data.userId);
+    await updateDoc(doc(db, 'teamJoinRequests', requestId), { status: 'approved' });
+    
+    // Notify player
+    await addDoc(collection(db, 'notifications'), {
+      type: 'join_approved',
+      toUserId: data.userId,
+      teamId: data.teamId,
+      createdAt: new Date().toISOString(),
+      read: false,
+    });
+  } else {
+    await updateDoc(doc(db, 'teamJoinRequests', requestId), { status: 'denied' });
   }
 };

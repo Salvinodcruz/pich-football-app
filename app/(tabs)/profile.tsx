@@ -14,7 +14,9 @@ import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'fireb
 import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import ChevronBackground from '@/src/components/ChevronBackground';
+import PremiumBackground from '@/src/components/PremiumBackground';
+import SkillHexagon from '@/src/components/SkillHexagon';
+import { Ionicons } from '@expo/vector-icons';
 
 const POSITIONS = ['GK', 'DEF', 'MID', 'FWD'];
 const EMIRATES = ['Sharjah', 'Dubai', 'Ajman'];
@@ -41,6 +43,15 @@ export default function ProfileScreen() {
   const [editDobYear, setEditDobYear] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Derived stats for Hexagon
+  const hexagonStats = {
+    attack: Math.min(100, (profile?.goals || 0) * 10 + (profile?.skillRating || 0) * 0.4),
+    defense: Math.min(100, (profile?.matches || 0) * 2 + (profile?.position === 'DEF' || profile?.position === 'GK' ? 60 : 25)),
+    speed: Math.min(100, (profile?.matches || 0) * 3 + 35),
+    passing: Math.min(100, (profile?.assists || 0) * 15 + (profile?.skillRating || 0) * 0.2),
+    stamina: Math.min(100, (profile?.matches || 0) * 5 + 10),
+  };
 
   useEffect(() => {
     loadProfile();
@@ -110,7 +121,7 @@ export default function ProfileScreen() {
       if (!user) return;
       await updateDoc(doc(db, 'users', user.uid), { photoURL: `data:image/jpeg;base64,${result.assets[0].base64}` });
       await loadProfile();
-      Alert.alert('✅ Photo Updated!');
+      Alert.alert('Photo Updated!');
     } catch (e) {
       Alert.alert('Error', 'Could not upload photo');
     } finally {
@@ -137,7 +148,7 @@ export default function ProfileScreen() {
       });
       await loadProfile();
       setShowEditModal(false);
-      Alert.alert('Saved! ✅');
+      Alert.alert('Saved!');
     } catch (e) {
       Alert.alert('Error', 'Could not save changes');
     } finally {
@@ -182,27 +193,26 @@ export default function ProfileScreen() {
   const posColor = positionColors[profile?.position] || Colors.dark.tint;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
-      <ChevronBackground />
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
       <ScrollView
         style={styles.container}
         contentContainerStyle={[styles.content, {
           paddingTop: insets.top + Spacing.md,
           paddingBottom: insets.bottom + 80,
         }]}
+        showsVerticalScrollIndicator={false}
       >
-        {/* ── Header Row ── */}
-        <View style={styles.headerRow}>
+        {/* ── Header Glass Row ── */}
+        <View style={styles.headerGlass}>
           <Text style={styles.pageTitle}>Profile</Text>
           <View style={styles.headerIcons}>
-            {/* Friends icon */}
             <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/friends')}>
-              <Text style={styles.iconBtnText}>👥</Text>
+              <Ionicons name="people-outline" size={20} color="#FFF" />
             </TouchableOpacity>
 
-            {/* Notifications bell */}
             <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/notifications')}>
-              <Text style={styles.iconBtnText}>🔔</Text>
+              <Ionicons name="notifications-outline" size={20} color="#FFF" />
               {unreadCount > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
@@ -210,9 +220,8 @@ export default function ProfileScreen() {
               )}
             </TouchableOpacity>
 
-            {/* Menu */}
             <TouchableOpacity style={styles.iconBtn} onPress={() => setShowDropdown(!showDropdown)}>
-              <Text style={styles.iconBtnText}>⋮</Text>
+              <Ionicons name="ellipsis-vertical" size={20} color="#FFF" />
             </TouchableOpacity>
           </View>
         </View>
@@ -221,17 +230,17 @@ export default function ProfileScreen() {
         {showDropdown && (
           <Animated.View style={[styles.dropdown, { opacity: fadeAnim }]}>
             <TouchableOpacity style={styles.dropdownItem} onPress={() => { setShowDropdown(false); setShowEditModal(true); }}>
-              <Text style={styles.dropdownIcon}>✏️</Text>
+              <Ionicons name="pencil-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
               <Text style={styles.dropdownText}>Edit Profile</Text>
             </TouchableOpacity>
             <View style={styles.dropdownDivider} />
             <TouchableOpacity style={styles.dropdownItem} onPress={() => { setShowDropdown(false); setShowPlayerInfo(true); }}>
-              <Text style={styles.dropdownIcon}>🪪</Text>
+              <Ionicons name="id-card-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
               <Text style={styles.dropdownText}>Player Info</Text>
             </TouchableOpacity>
             <View style={styles.dropdownDivider} />
             <View style={styles.dropdownItemRow}>
-              <Text style={styles.dropdownIcon}>👟</Text>
+              <Ionicons name="walk-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
               <Text style={styles.dropdownText}>Free Agent</Text>
               <Switch
                 value={isFreeAgent}
@@ -243,7 +252,7 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.dropdownDivider} />
             <TouchableOpacity style={styles.dropdownItem} onPress={handleSignOut}>
-              <Text style={styles.dropdownIcon}>🚪</Text>
+              <Ionicons name="log-out-outline" size={18} color="#FF4444" style={styles.dropdownIcon} />
               <Text style={[styles.dropdownText, { color: '#FF4444' }]}>Sign Out</Text>
             </TouchableOpacity>
           </Animated.View>
@@ -252,17 +261,15 @@ export default function ProfileScreen() {
 
         {/* ── Hero Section ── */}
         <View style={styles.heroSection}>
-          {/* Avatar with glow */}
           <TouchableOpacity style={styles.avatarWrapper} onPress={handlePhotoUpload} disabled={uploadingPhoto}>
-            <View style={styles.avatarGlow}>
+            <View style={[styles.avatarGlow, { borderColor: posColor, shadowColor: posColor }]}>
               {profile?.photoURL ? (
                 <Image source={{ uri: profile.photoURL }} style={styles.avatarImage} />
               ) : (
                 <View style={styles.avatarPlaceholder}>
-                  <Text style={styles.avatarInitials}>{initials.toUpperCase()}</Text>
+                  <Text style={[styles.avatarInitials, { color: posColor }]}>{initials.toUpperCase()}</Text>
                 </View>
               )}
-              {/* Position badge on avatar */}
               {profile?.position && (
                 <View style={[styles.posBadgeOnAvatar, { backgroundColor: posColor }]}>
                   <Text style={styles.posBadgeText}>{profile.position}</Text>
@@ -272,43 +279,50 @@ export default function ProfileScreen() {
             <View style={styles.cameraBtn}>
               {uploadingPhoto
                 ? <ActivityIndicator size="small" color={Colors.dark.tint} />
-                : <Text style={{ fontSize: 12 }}>📷</Text>
+                : <Ionicons name="camera" size={14} color="#FFF" />
               }
             </View>
           </TouchableOpacity>
 
-          {/* Name + ID */}
-          <Text style={styles.heroName}>{displayName}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={styles.heroName}>{displayName}</Text>
+            <Ionicons name="hand-right-outline" size={18} color={Colors.dark.tint} />
+          </View>
           <View style={styles.heroSubRow}>
             {profile?.playerId && (
-              <View style={styles.playerIdChip}>
-                <Text style={styles.playerIdChipText}>{profile.playerId}</Text>
+              <View style={[styles.playerIdChip, { borderColor: posColor + '40', backgroundColor: posColor + '10' }]}>
+                <Text style={[styles.playerIdChipText, { color: posColor }]}>{profile.playerId}</Text>
               </View>
             )}
             {profile?.emirate && (
-              <Text style={styles.heroMeta}>📍 {profile.emirate}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="location-outline" size={12} color="#666" />
+                <Text style={styles.heroMeta}>{profile.emirate}</Text>
+              </View>
             )}
           </View>
-          {profile?.dob && <Text style={styles.heroDob}>🎂 {profile.dob}</Text>}
         </View>
 
-        {/* ── Rating Hero ── */}
-        <View style={styles.ratingHero}>
-          <View style={styles.ratingRing}>
-            <Text style={styles.ratingValue}>{profile?.skillRating ?? 0}</Text>
-            <Text style={styles.ratingLabel}>RATING</Text>
+        {/* ── Hexagon & Rating ── */}
+        <View style={styles.dataContainer}>
+          <SkillHexagon stats={hexagonStats} color={posColor} />
+          <View style={styles.ratingHero}>
+            <View style={[styles.ratingRing, { borderColor: posColor, backgroundColor: posColor + '10', shadowColor: posColor }]}>
+              <Text style={[styles.ratingValue, { color: posColor }]}>{profile?.skillRating ?? 0}</Text>
+              <Text style={[styles.ratingLabel, { color: posColor }]}>RATING</Text>
+            </View>
           </View>
         </View>
 
         {/* ── Stats Row ── */}
         <View style={styles.statsRow}>
           {[
-            { label: 'Matches', value: profile?.matches || 0, icon: '🏟' },
-            { label: 'Goals', value: profile?.goals || 0, icon: '⚽' },
-            { label: 'Assists', value: profile?.assists || 0, icon: '🎯' },
+            { label: 'Matches', value: profile?.matches || 0, icon: 'calendar-outline' },
+            { label: 'Goals', value: profile?.goals || 0, icon: 'football-outline' },
+            { label: 'Assists', value: profile?.assists || 0, icon: 'flash-outline' },
           ].map(stat => (
             <View key={stat.label} style={styles.statGlass}>
-              <Text style={styles.statIcon}>{stat.icon}</Text>
+              <Ionicons name={stat.icon as any} size={20} color="#666" />
               <Text style={styles.statVal}>{stat.value}</Text>
               <Text style={styles.statLbl}>{stat.label}</Text>
             </View>
@@ -317,13 +331,13 @@ export default function ProfileScreen() {
 
         {/* ── Action Row ── */}
         <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.actionHalf} onPress={() => router.push('/friends')}>
-            <Text style={styles.actionHalfIcon}>👥</Text>
-            <Text style={styles.actionHalfText}>Friends</Text>
+          <TouchableOpacity style={styles.actionGlass} onPress={() => router.push('/friends')}>
+            <Ionicons name="people-outline" size={18} color="#aaa" />
+            <Text style={styles.actionGlassText}>Friends</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionHalf, styles.actionHalfGreen]} onPress={() => router.push('/free-agents')}>
-            <Text style={styles.actionHalfIcon}>👟</Text>
-            <Text style={[styles.actionHalfText, { color: Colors.dark.tint }]}>Free Agents</Text>
+          <TouchableOpacity style={[styles.actionGlass, styles.actionGlassGreen]} onPress={() => router.push('/free-agents')}>
+            <Ionicons name="walk-outline" size={18} color={Colors.dark.tint} />
+            <Text style={[styles.actionGlassText, { color: Colors.dark.tint }]}>Free Agents</Text>
           </TouchableOpacity>
         </View>
 
@@ -335,61 +349,66 @@ export default function ProfileScreen() {
               const { recalculateAllRatings } = await import('@/src/utils/ratingService');
               await recalculateAllRatings();
               loadProfile();
-              Alert.alert('✅', 'All ratings recalculated!');
+              Alert.alert('Done!', 'All ratings recalculated!');
             }}
           >
-            <Text style={styles.adminBtnText}>⚙️ Recalculate All Ratings</Text>
+             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="settings-outline" size={16} color="#FFC107" />
+                <Text style={styles.adminBtnText}>Recalculate All Ratings</Text>
+             </View>
           </TouchableOpacity>
         )}
       </ScrollView>
 
       {/* ── Edit Modal ── */}
       <Modal visible={showEditModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowEditModal(false)}>
-        <ScrollView style={styles.modalContainer} contentContainerStyle={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Edit Profile</Text>
-            <TouchableOpacity onPress={() => setShowEditModal(false)}>
-              <Text style={styles.modalClose}>✕ Close</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.inputLabel}>First Name *</Text>
-          <TextInput style={styles.input} value={editFirstName} onChangeText={setEditFirstName} placeholder="First Name" placeholderTextColor={Colors.dark.textSecondary} autoCapitalize="words" />
-          <Text style={styles.inputLabel}>Middle Name</Text>
-          <TextInput style={styles.input} value={editMiddleName} onChangeText={setEditMiddleName} placeholder="Middle Name" placeholderTextColor={Colors.dark.textSecondary} autoCapitalize="words" />
-          <Text style={styles.inputLabel}>Last Name *</Text>
-          <TextInput style={styles.input} value={editLastName} onChangeText={setEditLastName} placeholder="Last Name" placeholderTextColor={Colors.dark.textSecondary} autoCapitalize="words" />
-          <Text style={styles.inputLabel}>Date of Birth</Text>
-          <View style={styles.dobRow}>
-            <TextInput style={[styles.input, styles.dobDay]} value={editDobDay} onChangeText={setEditDobDay} placeholder="DD" placeholderTextColor={Colors.dark.textSecondary} keyboardType="numeric" maxLength={2} />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-              {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map(m => (
-                <TouchableOpacity key={m} style={[styles.monthBtn, editDobMonth === m && styles.monthBtnActive]} onPress={() => setEditDobMonth(m)}>
-                  <Text style={[styles.monthText, editDobMonth === m && styles.monthTextActive]}>{m}</Text>
+        <View style={styles.modalContainer}>
+          <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Profile</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <Ionicons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.inputLabel}>First Name *</Text>
+            <TextInput style={styles.input} value={editFirstName} onChangeText={setEditFirstName} placeholder="First Name" placeholderTextColor={Colors.dark.textSecondary} autoCapitalize="words" />
+            <Text style={styles.inputLabel}>Middle Name</Text>
+            <TextInput style={styles.input} value={editMiddleName} onChangeText={setEditMiddleName} placeholder="Middle Name" placeholderTextColor={Colors.dark.textSecondary} autoCapitalize="words" />
+            <Text style={styles.inputLabel}>Last Name *</Text>
+            <TextInput style={styles.input} value={editLastName} onChangeText={setEditLastName} placeholder="Last Name" placeholderTextColor={Colors.dark.textSecondary} autoCapitalize="words" />
+            <Text style={styles.inputLabel}>Date of Birth</Text>
+            <View style={styles.dobRow}>
+              <TextInput style={[styles.input, styles.dobDay]} value={editDobDay} onChangeText={setEditDobDay} placeholder="DD" placeholderTextColor={Colors.dark.textSecondary} keyboardType="numeric" maxLength={2} />
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+                {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map(m => (
+                  <TouchableOpacity key={m} style={[styles.monthBtn, editDobMonth === m && styles.monthBtnActive]} onPress={() => setEditDobMonth(m)}>
+                    <Text style={[styles.monthText, editDobMonth === m && styles.monthTextActive]}>{m}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TextInput style={[styles.input, styles.dobYear]} value={editDobYear} onChangeText={setEditDobYear} placeholder="YYYY" placeholderTextColor={Colors.dark.textSecondary} keyboardType="numeric" maxLength={4} />
+            </View>
+            <Text style={styles.inputLabel}>Position</Text>
+            <View style={styles.optionRow}>
+              {POSITIONS.map(p => (
+                <TouchableOpacity key={p} style={[styles.optionBtn, editPosition === p && styles.optionBtnActive]} onPress={() => setEditPosition(p)}>
+                  <Text style={[styles.optionText, editPosition === p && styles.optionTextActive]}>{p}</Text>
                 </TouchableOpacity>
               ))}
-            </ScrollView>
-            <TextInput style={[styles.input, styles.dobYear]} value={editDobYear} onChangeText={setEditDobYear} placeholder="YYYY" placeholderTextColor={Colors.dark.textSecondary} keyboardType="numeric" maxLength={4} />
-          </View>
-          <Text style={styles.inputLabel}>Position</Text>
-          <View style={styles.optionRow}>
-            {POSITIONS.map(p => (
-              <TouchableOpacity key={p} style={[styles.optionBtn, editPosition === p && styles.optionBtnActive]} onPress={() => setEditPosition(p)}>
-                <Text style={[styles.optionText, editPosition === p && styles.optionTextActive]}>{p}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <Text style={styles.inputLabel}>Emirate</Text>
-          <View style={styles.optionRow}>
-            {EMIRATES.map(e => (
-              <TouchableOpacity key={e} style={[styles.optionBtn, editEmirate === e && styles.optionBtnActive]} onPress={() => setEditEmirate(e)}>
-                <Text style={[styles.optionText, editEmirate === e && styles.optionTextActive]}>{e}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSaveEdit} disabled={saving}>
-            {saving ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
-          </TouchableOpacity>
-        </ScrollView>
+            </View>
+            <Text style={styles.inputLabel}>Emirate</Text>
+            <View style={styles.optionRow}>
+              {EMIRATES.map(e => (
+                <TouchableOpacity key={e} style={[styles.optionBtn, editEmirate === e && styles.optionBtnActive]} onPress={() => setEditEmirate(e)}>
+                  <Text style={[styles.optionText, editEmirate === e && styles.optionTextActive]}>{e}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSaveEdit} disabled={saving}>
+              {saving ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
       </Modal>
 
       {/* ── Player Info Modal ── */}
@@ -399,21 +418,24 @@ export default function ProfileScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Player Info</Text>
               <TouchableOpacity onPress={() => setShowPlayerInfo(false)}>
-                <Text style={styles.modalClose}>✕ Close</Text>
+                <Ionicons name="close" size={24} color="#666" />
               </TouchableOpacity>
             </View>
             <View style={styles.infoCard}>
               {[
-                { label: 'Player ID', value: profile?.playerId, color: Colors.dark.tint },
-                { label: 'Full Name', value: profile?.fullName || displayName },
-                { label: 'Position', value: profile?.position },
-                { label: 'Emirate', value: profile?.emirate },
-                { label: 'Date of Birth', value: profile?.dob },
-                { label: 'Free Agent', value: isFreeAgent ? 'Yes' : 'No', color: isFreeAgent ? Colors.dark.tint : undefined },
+                { label: 'Player ID', value: profile?.playerId, color: Colors.dark.tint, icon: 'id-card-outline' },
+                { label: 'Full Name', value: profile?.fullName || displayName, icon: 'person-outline' },
+                { label: 'Position', value: profile?.position, icon: 'football-outline' },
+                { label: 'Emirate', value: profile?.emirate, icon: 'location-outline' },
+                { label: 'Date of Birth', value: profile?.dob, icon: 'calendar-outline' },
+                { label: 'Free Agent', value: isFreeAgent ? 'Yes' : 'No', color: isFreeAgent ? Colors.dark.tint : undefined, icon: 'walk-outline' },
               ].map((row, i, arr) => (
                 <View key={row.label}>
                   <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>{row.label}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <Ionicons name={row.icon as any} size={18} color="#666" style={{ width: 24 }} />
+                      <Text style={styles.infoLabel}>{row.label}</Text>
+                    </View>
                     <Text style={[styles.infoValue, row.color ? { color: row.color } : {}]}>{row.value || '—'}</Text>
                   </View>
                   {i < arr.length - 1 && <View style={styles.infoDivider} />}
@@ -431,15 +453,24 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: Spacing.lg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.dark.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#050505' },
 
-  // Header
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xl },
+  // Header Glass
+  headerGlass: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+    padding: Spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
   pageTitle: { fontSize: FontSizes.xxl, fontWeight: FontWeights.bold, color: '#fff' },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  iconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#141414CC', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#2A2A2A', position: 'relative' },
-  iconBtnText: { fontSize: 16 },
-  badge: { position: 'absolute', top: -3, right: -3, backgroundColor: '#FF4444', borderRadius: 8, minWidth: 15, height: 15, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: '#0A0A0A' },
+  iconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', position: 'relative' },
+  badge: { position: 'absolute', top: -3, right: -3, backgroundColor: '#FF4444', borderRadius: 8, minWidth: 15, height: 15, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: '#050505' },
   badgeText: { color: '#fff', fontSize: 8, fontWeight: FontWeights.bold },
 
   // Dropdown
@@ -447,7 +478,7 @@ const styles = StyleSheet.create({
   dropdownOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 },
   dropdownItem: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, gap: Spacing.sm },
   dropdownItemRow: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, gap: Spacing.sm },
-  dropdownIcon: { fontSize: 16, width: 24 },
+  dropdownIcon: { marginRight: 8 },
   dropdownText: { color: '#fff', fontSize: FontSizes.sm },
   dropdownDivider: { height: 1, backgroundColor: '#2A2A2A' },
 
@@ -456,8 +487,7 @@ const styles = StyleSheet.create({
   avatarWrapper: { position: 'relative', marginBottom: Spacing.md },
   avatarGlow: {
     width: 96, height: 96, borderRadius: 48,
-    borderWidth: 2.5, borderColor: Colors.dark.tint,
-    shadowColor: Colors.dark.tint,
+    borderWidth: 2.5,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 12,
@@ -466,77 +496,79 @@ const styles = StyleSheet.create({
   },
   avatarImage: { width: '100%', height: '100%', borderRadius: 48 },
   avatarPlaceholder: { width: '100%', height: '100%', backgroundColor: '#1A1A1A', justifyContent: 'center', alignItems: 'center' },
-  avatarInitials: { color: Colors.dark.tint, fontSize: FontSizes.xl, fontWeight: FontWeights.bold },
-  posBadgeOnAvatar: { position: 'absolute', bottom: 0, right: -2, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1.5, borderColor: '#0A0A0A' },
+  avatarInitials: { fontSize: FontSizes.xl, fontWeight: FontWeights.bold },
+  posBadgeOnAvatar: { position: 'absolute', bottom: 0, right: -2, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1.5, borderColor: '#050505' },
   posBadgeText: { color: '#000', fontSize: 9, fontWeight: FontWeights.bold },
   cameraBtn: { position: 'absolute', bottom: -2, right: -2, backgroundColor: '#1A1A1A', borderRadius: 12, width: 24, height: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#2A2A2A' },
   heroName: { fontSize: 22, fontWeight: FontWeights.bold, color: '#fff', marginBottom: 6 },
   heroSubRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: 4 },
-  playerIdChip: { backgroundColor: Colors.dark.tint + '15', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: Colors.dark.tint + '40' },
-  playerIdChipText: { color: Colors.dark.tint, fontSize: 11, fontWeight: FontWeights.bold, letterSpacing: 1 },
+  playerIdChip: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 },
+  playerIdChipText: { fontSize: 11, fontWeight: FontWeights.bold, letterSpacing: 1 },
   heroMeta: { color: '#666', fontSize: FontSizes.xs },
-  heroDob: { color: '#555', fontSize: FontSizes.xs, marginTop: 2 },
 
-  // Rating Ring
-  ratingHero: { alignItems: 'center', marginBottom: Spacing.lg },
+  // Data Container
+  dataContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.lg,
+    paddingHorizontal: Spacing.md,
+  },
+  ratingHero: { alignItems: 'center' },
   ratingRing: {
     width: 80, height: 80, borderRadius: 40,
-    borderWidth: 3, borderColor: Colors.dark.tint,
-    backgroundColor: Colors.dark.tint + '10',
+    borderWidth: 3,
     justifyContent: 'center', alignItems: 'center',
-    shadowColor: Colors.dark.tint,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.4,
     shadowRadius: 10,
     elevation: 6,
   },
-  ratingValue: { color: Colors.dark.tint, fontSize: 24, fontWeight: FontWeights.bold },
-  ratingLabel: { color: Colors.dark.tint, fontSize: 8, fontWeight: FontWeights.bold, letterSpacing: 1 },
+  ratingValue: { fontSize: 24, fontWeight: FontWeights.bold },
+  ratingLabel: { fontSize: 8, fontWeight: FontWeights.bold, letterSpacing: 1 },
 
   // Stats
   statsRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.lg },
   statGlass: {
     flex: 1,
-    backgroundColor: '#141414CC',
+    backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2A2A2A',
-    gap: 4,
+    borderColor: 'rgba(255,255,255,0.05)',
+    gap: 8,
   },
-  statIcon: { fontSize: 16 },
   statVal: { color: '#fff', fontSize: FontSizes.lg, fontWeight: FontWeights.bold },
   statLbl: { color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
 
   // Action Row
   actionRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
-  actionHalf: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, backgroundColor: '#141414CC', borderRadius: BorderRadius.md, padding: Spacing.md, borderWidth: 1, borderColor: '#2A2A2A' },
-  actionHalfGreen: { borderColor: Colors.dark.tint + '40', backgroundColor: Colors.dark.tint + '08' },
-  actionHalfIcon: { fontSize: 16 },
-  actionHalfText: { color: '#aaa', fontSize: FontSizes.sm, fontWeight: FontWeights.semibold },
+  actionGlass: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: BorderRadius.md, padding: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  actionGlassGreen: { borderColor: 'rgba(0,230,118,0.2)', backgroundColor: 'rgba(0,230,118,0.05)' },
+  actionGlassText: { color: '#aaa', fontSize: FontSizes.sm, fontWeight: FontWeights.semibold },
 
   // Admin
-  adminBtn: { backgroundColor: '#FFC10715', borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center', marginBottom: Spacing.md, borderWidth: 1, borderColor: '#FFC10740' },
+  adminBtn: { backgroundColor: 'rgba(255,193,7,0.05)', borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center', marginBottom: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,193,7,0.1)' },
   adminBtnText: { color: '#FFC107', fontSize: FontSizes.sm, fontWeight: FontWeights.semibold },
 
   // Modal
-  modalContainer: { flex: 1, backgroundColor: Colors.dark.background },
+  modalContainer: { flex: 1, backgroundColor: '#050505' },
   modalContent: { padding: Spacing.lg, paddingBottom: 60 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xl, marginTop: Spacing.md },
   modalTitle: { fontSize: FontSizes.xl, fontWeight: FontWeights.bold, color: '#fff' },
   modalClose: { color: '#666', fontSize: FontSizes.sm },
   inputLabel: { color: '#666', fontSize: FontSizes.xs, fontWeight: FontWeights.semibold, marginTop: Spacing.md, marginBottom: Spacing.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: { backgroundColor: '#1A1A1A', borderRadius: BorderRadius.md, padding: Spacing.md, color: '#fff', fontSize: FontSizes.md, borderWidth: 1, borderColor: '#2A2A2A' },
+  input: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: BorderRadius.md, padding: Spacing.md, color: '#fff', fontSize: FontSizes.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   dobRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.xs },
   dobDay: { width: 60, textAlign: 'center' },
   dobYear: { width: 80, textAlign: 'center' },
-  monthBtn: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.sm, borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: '#2A2A2A', backgroundColor: '#1A1A1A', marginRight: Spacing.xs },
+  monthBtn: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.sm, borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.03)', marginRight: Spacing.xs },
   monthBtnActive: { borderColor: Colors.dark.tint, backgroundColor: Colors.dark.tint + '20' },
   monthText: { color: '#666', fontSize: FontSizes.xs },
   monthTextActive: { color: Colors.dark.tint, fontWeight: FontWeights.bold },
   optionRow: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap', marginBottom: Spacing.xs },
-  optionBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: '#2A2A2A', backgroundColor: '#1A1A1A' },
+  optionBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.03)' },
   optionBtnActive: { borderColor: Colors.dark.tint, backgroundColor: Colors.dark.tint + '20' },
   optionText: { color: '#666', fontSize: FontSizes.sm },
   optionTextActive: { color: Colors.dark.tint, fontWeight: FontWeights.bold },
@@ -544,10 +576,10 @@ const styles = StyleSheet.create({
   saveBtnText: { color: '#000', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
 
   // Player Info
-  infoCard: { backgroundColor: '#1A1A1A', borderRadius: BorderRadius.md, padding: Spacing.md, borderWidth: 1, borderColor: '#2A2A2A' },
+  infoCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: BorderRadius.md, padding: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.sm },
   infoLabel: { color: '#666', fontSize: FontSizes.sm },
   infoValue: { color: '#fff', fontSize: FontSizes.sm, fontWeight: FontWeights.semibold },
-  infoDivider: { height: 1, backgroundColor: '#2A2A2A' },
+  infoDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)' },
   shareHint: { color: '#444', fontSize: FontSizes.xs, textAlign: 'center', marginTop: Spacing.lg, lineHeight: 18 },
 });

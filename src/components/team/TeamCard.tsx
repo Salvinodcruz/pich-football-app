@@ -7,6 +7,7 @@ import React from 'react';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import type { Team } from '@/src/types';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface TeamCardProps {
   team: Team;
@@ -49,7 +50,10 @@ export default function TeamCard({ team, onPress, showDetails }: TeamCardProps) 
           )}
         </View>
         <View style={styles.rating}>
-          <Text style={styles.ratingText}>⭐ {team.skillRating?.toFixed(1)}</Text>
+          <View style={styles.ratingRow}>
+            <Ionicons name="star" size={14} color="#FFD700" />
+            <Text style={styles.ratingText}>{team.skillRating?.toFixed(1)}</Text>
+          </View>
         </View>
       </View>
 
@@ -86,11 +90,11 @@ export default function TeamCard({ team, onPress, showDetails }: TeamCardProps) 
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.dark.card,
-    borderRadius: BorderRadius.md,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 20,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: 'rgba(255,255,255,0.05)',
     gap: Spacing.sm,
   },
   header: {
@@ -127,6 +131,11 @@ const styles = StyleSheet.create({
   rating: {
     alignItems: 'flex-end',
   },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   ratingText: {
     color: Colors.dark.text,
     fontSize: FontSizes.sm,
@@ -154,14 +163,14 @@ const styles = StyleSheet.create({
   divider: {
     width: 1,
     height: 24,
-    backgroundColor: Colors.dark.border,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     marginHorizontal: Spacing.xs,
   },
   badge: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.dark.background,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   badgeLabel: {
     fontSize: FontSizes.xs,

@@ -10,7 +10,8 @@ import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import { recalculateAllRatings } from '@/src/utils/ratingService';
 import CustomDialog from '@/src/components/CustomDialog';
-import ChevronBackground from '@/src/components/ChevronBackground';
+import PremiumBackground from '@/src/components/PremiumBackground';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function SubmitResultScreen() {
   const insets = useSafeAreaInsets();
@@ -88,17 +89,6 @@ const handleSubmit = async () => {
     const otherField = isHome === 'true' ? 'awayScoreSubmitted' : 'homeScoreSubmitted';
     const scoreToSubmit = { home: homeScore, away: awayScore };
 
-    console.log('📋 challengeId:', challengeId);
-    console.log('📋 isHome:', isHome);
-    console.log('📋 field:', field);
-    console.log('📋 otherField:', otherField);
-    console.log('📋 scoreToSubmit:', scoreToSubmit);
-    console.log('📋 data[otherField]:', data[otherField]);
-    console.log('📋 challenge status:', data.status);
-    console.log('📋 myTeamId:', myTeamId);
-    console.log('📋 fromTeamId:', data.fromTeamId);
-    console.log('📋 toTeamId:', data.toTeamId);
-
       // Save player stats with submission
       const playerStatsSubmission = myPlayers.map(p => ({
         playerId: p.id,
@@ -113,16 +103,31 @@ const handleSubmit = async () => {
         [`${field}PlayerStats`]: playerStatsSubmission,
       });
 
+      // Notify the other captain about the submission
+      try {
+        const otherTeamId = isHome === 'true' ? data.toTeamId : data.fromTeamId;
+        const otherTeamDoc = await getDoc(doc(db, 'teams', otherTeamId));
+        const otherCaptainId = otherTeamDoc.data()?.captainId;
+        if (otherCaptainId) {
+          await addDoc(collection(db, 'notifications'), {
+            type: 'result_submitted',
+            toUserId: otherCaptainId,
+            fromTeamName: myTeamName,
+            matchDate: data.date,
+            matchTime: data.time,
+            challengeId,
+            status: 'pending',
+            read: false,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      } catch (e) {
+        console.error('Result notification error:', e);
+      }
+
       if (data[otherField]) {
         const other = data[otherField];
         
-        console.log('🔍 Comparing scores:');
-        console.log('My submission:', JSON.stringify(scoreToSubmit));
-        console.log('Other submission:', JSON.stringify(other));
-        console.log('home match:', other.home === homeScore, '|', other.home, 'vs', homeScore);
-        console.log('away match:', other.away === awayScore, '|', other.away, 'vs', awayScore);
-        console.log('Types - other.home:', typeof other.home, 'homeScore:', typeof homeScore);
-
         if (other.home === homeScore && other.away === awayScore) {
           await updateDoc(doc(db, 'challenges', challengeId), {
             status: 'completed',
@@ -142,21 +147,21 @@ const handleSubmit = async () => {
           await recalculateAllRatings();
 
           showResult(
-            '✅ Result Confirmed!',
+            'Result Confirmed!',
             `${homeTeam} ${homeScore} - ${awayScore} ${awayTeam}\n\nPlayer stats have been updated!`,
             () => router.replace('/(tabs)/my-team')
           );
         } else {
           await updateDoc(doc(db, 'challenges', challengeId), { status: 'disputed' });
           showResult(
-            '⚠️ Score Disputed',
+            'Score Disputed',
             `Your score: ${homeScore} - ${awayScore}\nTheir score: ${other.home} - ${other.away}\n\nAn admin will review.`,
             () => router.replace('/(tabs)/my-team')
           );
         }
       } else {
         showResult(
-          '✅ Score Submitted',
+          'Score Submitted',
           'Waiting for the other captain to submit their score.',
           () => router.back()
         );
@@ -239,26 +244,33 @@ const handleSubmit = async () => {
   );
 
   if (loading) return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A', justifyContent: 'center', alignItems: 'center' }}>
-      <ChevronBackground />
+    <View style={{ flex: 1, backgroundColor: '#050505', justifyContent: 'center', alignItems: 'center' }}>
+      <PremiumBackground />
       <ActivityIndicator size="large" color={Colors.dark.tint} />
     </View>
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
-      <ChevronBackground />
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
       <ScrollView
-        style={[styles.container, { backgroundColor: 'transparent' }]}
+        style={{ flex: 1, backgroundColor: 'transparent' }}
         contentContainerStyle={[styles.content, {
           paddingTop: insets.top + Spacing.md,
           paddingBottom: insets.bottom + 40,
         }]}
+        showsVerticalScrollIndicator={false}
       >
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="arrow-back" size={20} color={Colors.dark.tint} />
+            <Text style={styles.backText}>Back</Text>
+          </View>
         </TouchableOpacity>
-        <Text style={styles.pageTitle}>Submit Result</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <Ionicons name="clipboard-outline" size={24} color={Colors.dark.tint} />
+          <Text style={styles.pageTitle}>Submit Result</Text>
+        </View>
         <Text style={styles.subtitle}>{homeTeam} vs {awayTeam}</Text>
 
         {/* Score Card */}
@@ -293,7 +305,10 @@ const handleSubmit = async () => {
         {myPlayers.length > 0 && (
           <View style={styles.playerStatsSection}>
             <View style={styles.playerStatsHeader}>
-              <Text style={styles.playerStatsTitle}>⚽ {myTeamName}'s Scorers</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="football" size={18} color="#fff" />
+                <Text style={styles.playerStatsTitle}>{myTeamName}'s Scorers</Text>
+              </View>
               <Text style={styles.playerStatsSubtitle}>
                 {totalGoalsAssigned}/{myCurrentScore} goals assigned
               </Text>
@@ -301,9 +316,12 @@ const handleSubmit = async () => {
 
             {totalGoalsAssigned > myCurrentScore && (
               <View style={styles.warningCard}>
-                <Text style={styles.warningText}>
-                  ⚠️ Goals assigned ({totalGoalsAssigned}) exceed {myTeamName}'s score ({myCurrentScore})
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="warning-outline" size={14} color="#FFC107" />
+                  <Text style={styles.warningText}>
+                    Goals assigned ({totalGoalsAssigned}) exceed {myTeamName}'s score ({myCurrentScore})
+                  </Text>
+                </View>
               </View>
             )}
 
@@ -336,7 +354,7 @@ const handleSubmit = async () => {
 
                   {/* Goals */}
                   <View style={styles.statControl}>
-                    <Text style={styles.statLabel}>⚽</Text>
+                    <Ionicons name="football-outline" size={14} color="#aaa" />
                     <TouchableOpacity
                       style={styles.statBtn}
                       onPress={() => setPlayerGoals(prev => ({ ...prev, [player.id]: Math.max(0, (prev[player.id] || 0) - 1) }))}
@@ -354,7 +372,7 @@ const handleSubmit = async () => {
 
                   {/* Assists */}
                   <View style={styles.statControl}>
-                    <Text style={styles.statLabel}>🎯</Text>
+                    <MaterialCommunityIcons name="bullseye-arrow" size={14} color="#aaa" />
                     <TouchableOpacity
                       style={styles.statBtn}
                       onPress={() => setPlayerAssists(prev => ({ ...prev, [player.id]: Math.max(0, (prev[player.id] || 0) - 1) }))}
@@ -376,9 +394,12 @@ const handleSubmit = async () => {
         )}
 
         <View style={styles.infoCard}>
-          <Text style={styles.infoText}>
-            ℹ️ Both captains must submit the same score. Player goals/assists update automatically when confirmed.
-          </Text>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Ionicons name="information-circle-outline" size={18} color="#666" />
+            <Text style={styles.infoText}>
+              Both captains must submit the same score. Player goals/assists update automatically when confirmed.
+            </Text>
+          </View>
         </View>
 
         <TouchableOpacity

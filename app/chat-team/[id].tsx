@@ -8,7 +8,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { collection, addDoc, query, orderBy, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
-import ChevronBackground from '@/src/components/ChevronBackground';
+import PremiumBackground from '@/src/components/PremiumBackground';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function TeamChatScreen() {
   const insets = useSafeAreaInsets();
@@ -62,28 +63,32 @@ export default function TeamChatScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
-      <ChevronBackground />
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backText}>←</Text>
+            <Ionicons name="chevron-back" size={24} color={Colors.dark.tint} />
           </TouchableOpacity>
           <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle}>💬 Team Chat</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="chatbubbles" size={20} color={Colors.dark.tint} />
+              <Text style={styles.headerTitle}>Team Chat</Text>
+            </View>
             <Text style={styles.headerSub}>{teamName?.replace(' Chat', '')}</Text>
           </View>
         </View>
 
         <ScrollView
           ref={scrollRef}
+          showsVerticalScrollIndicator={false}
           style={styles.messages}
           contentContainerStyle={styles.messagesContent}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         >
           {messages.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>💬</Text>
+              <Ionicons name="chatbubble-ellipses-outline" size={64} color="rgba(255,255,255,0.1)" />
               <Text style={styles.emptyTitle}>No messages yet</Text>
               <Text style={styles.emptySub}>Start the conversation with your team!</Text>
             </View>
@@ -103,7 +108,7 @@ export default function TeamChatScreen() {
           )}
         </ScrollView>
 
-        <View style={[styles.inputRow, { paddingBottom: insets.bottom + Spacing.sm }]}>
+        <View style={[styles.inputRow, { paddingBottom: insets.bottom + Spacing.md }]}>
           <TextInput
             style={styles.input}
             value={text}
@@ -118,7 +123,7 @@ export default function TeamChatScreen() {
             onPress={sendMessage}
             disabled={!text.trim() || sending}
           >
-            <Text style={styles.sendBtnText}>→</Text>
+            <Ionicons name="send" size={20} color="#000" />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -127,27 +132,24 @@ export default function TeamChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { backgroundColor: '#141414', flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: '#2A2A2A' },
-  backText: { color: Colors.dark.tint, fontSize: FontSizes.xl },
+  header: { backgroundColor: 'rgba(255,255,255,0.03)', flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
   headerInfo: { flex: 1 },
   headerTitle: { color: '#fff', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
   headerSub: { color: '#666', fontSize: FontSizes.xs },
-  messages: { flex: 1 },
+  messages: { flex: 1, backgroundColor: 'transparent' },
   messagesContent: { padding: Spacing.md, gap: Spacing.sm, paddingBottom: Spacing.xl },
   empty: { alignItems: 'center', marginTop: 80, gap: Spacing.md },
-  emptyIcon: { fontSize: 48 },
   emptyTitle: { color: '#fff', fontSize: FontSizes.lg, fontWeight: FontWeights.bold },
   emptySub: { color: '#666', fontSize: FontSizes.sm, textAlign: 'center' },
-  bubble: { maxWidth: '75%', padding: Spacing.sm, borderRadius: BorderRadius.md, gap: 2 },
+  bubble: { maxWidth: '75%', padding: Spacing.md, borderRadius: 20, gap: 2 },
   myBubble: { alignSelf: 'flex-end', backgroundColor: Colors.dark.tint },
-  theirBubble: { alignSelf: 'flex-start', backgroundColor: '#1A1A1A', borderWidth: 1, borderColor: '#2A2A2A' },
+  theirBubble: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   senderName: { color: '#888', fontSize: FontSizes.xs, fontWeight: FontWeights.semibold },
-  msgText: { color: '#888', fontSize: FontSizes.sm },
+  msgText: { color: '#fff', fontSize: FontSizes.sm },
   myMsgText: { color: '#000' },
   msgTime: { color: '#666', fontSize: 10, alignSelf: 'flex-end' },
   myMsgTime: { color: '#00000060' },
-  inputRow: { flexDirection: 'row', gap: Spacing.sm, padding: Spacing.md, backgroundColor: '#141414', borderTopWidth: 1, borderTopColor: '#2A2A2A', alignItems: 'flex-end' },
-  input: { flex: 1, backgroundColor: '#0A0A0A', borderRadius: BorderRadius.md, padding: Spacing.sm, color: '#fff', fontSize: FontSizes.md, borderWidth: 1, borderColor: '#2A2A2A', maxHeight: 100 },
+  inputRow: { flexDirection: 'row', gap: Spacing.sm, padding: Spacing.md, backgroundColor: 'rgba(255,255,255,0.03)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', alignItems: 'flex-end' },
+  input: { flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: Spacing.sm, color: '#fff', fontSize: FontSizes.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', maxHeight: 100 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.dark.tint, justifyContent: 'center', alignItems: 'center' },
-  sendBtnText: { color: '#000', fontSize: FontSizes.lg, fontWeight: FontWeights.bold },
 });

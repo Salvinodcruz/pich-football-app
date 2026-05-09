@@ -5,16 +5,17 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { collection, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
-import ChevronBackground from '@/src/components/ChevronBackground';
+import PremiumBackground from '@/src/components/PremiumBackground';
+import { Ionicons } from '@expo/vector-icons';
 
 const REASONS = [
-  { id: 'no-show', label: '🚫 No-show — did not turn up' },
-  { id: 'fake-score', label: '❌ Fake or disputed score' },
-  { id: 'ineligible', label: '⚠️ Ineligible player' },
-  { id: 'abusive', label: '🔴 Abusive behaviour' },
+  { id: 'no-show', label: 'No-show — did not turn up', icon: 'person-remove-outline' },
+  { id: 'fake-score', label: 'Fake or disputed score', icon: 'close-circle-outline' },
+  { id: 'ineligible', label: 'Ineligible player', icon: 'warning-outline' },
+  { id: 'abusive', label: 'Abusive behaviour', icon: 'alert-circle-outline' },
 ];
 
 export default function ReportTeamScreen() {
@@ -56,7 +57,7 @@ export default function ReportTeamScreen() {
       });
 
       Alert.alert(
-        'Report Submitted ✅',
+        'Report Submitted!',
         'Our team will review this report. Verified reports will affect the team\'s trust score.',
         [{ text: 'OK', onPress: () => router.back() }]
       );
@@ -68,27 +69,37 @@ export default function ReportTeamScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
-      <ChevronBackground />
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
       <ScrollView
         style={styles.container}
         contentContainerStyle={[styles.content, {
           paddingTop: insets.top + Spacing.md,
           paddingBottom: insets.bottom + 40,
         }]}
+        showsVerticalScrollIndicator={false}
       >
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={styles.backText}>← Back</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Ionicons name="arrow-back" size={20} color={Colors.dark.tint} />
+          <Text style={styles.backText}>Back</Text>
+        </View>
       </TouchableOpacity>
       <Text style={styles.pageTitle}>Report a Team</Text>
 
       {/* Reported Team */}
       <View style={styles.reportedCard}>
-        <Text style={styles.reportedLabel}>Reporting</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Ionicons name="flag" size={16} color="#FF4444" />
+          <Text style={styles.reportedLabel}>Reporting Team</Text>
+        </View>
         <Text style={styles.reportedTeam}>{teamName}</Text>
-        <Text style={styles.reportedNote}>
-          Reports affect the team's trust score. Only submit with valid reason.
-        </Text>
+        <View style={styles.noteBox}>
+           <Ionicons name="information-circle-outline" size={14} color="rgba(255,255,255,0.4)" />
+           <Text style={styles.reportedNote}>
+            Verified reports will affect this team's trust score and rankings.
+          </Text>
+        </View>
       </View>
 
       {/* Reason */}
@@ -100,10 +111,11 @@ export default function ReportTeamScreen() {
             style={[styles.reasonBtn, reason === r.id && styles.reasonBtnActive]}
             onPress={() => setReason(r.id)}
           >
-            <View style={[styles.radio, reason === r.id && styles.radioActive]} />
+            <Ionicons name={r.icon as any} size={20} color={reason === r.id ? '#FF4444' : '#666'} />
             <Text style={[styles.reasonText, reason === r.id && styles.reasonTextActive]}>
               {r.label}
             </Text>
+            <View style={[styles.radio, reason === r.id && styles.radioActive]} />
           </TouchableOpacity>
         ))}
       </View>
@@ -114,28 +126,32 @@ export default function ReportTeamScreen() {
         style={styles.detailsInput}
         value={details}
         onChangeText={setDetails}
-        placeholder="Describe what happened..."
-        placeholderTextColor={Colors.dark.textSecondary}
+        placeholder="Describe exactly what happened..."
+        placeholderTextColor="#444"
         multiline
         numberOfLines={4}
       />
 
       {/* Proof Note */}
       <View style={styles.proofCard}>
-        <Text style={styles.proofTitle}>📎 Evidence</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <Ionicons name="attach" size={18} color="#FFF" />
+          <Text style={styles.proofTitle}>Evidence</Text>
+        </View>
         <Text style={styles.proofText}>
           If you have photo or video proof, please email it to reports@pich.app
-          with your team name and the opponent team name.
-          Reports without proof may be dismissed.
+          with your team name. Reports without proof may be dismissed.
         </Text>
       </View>
 
       {/* Warning */}
       <View style={styles.warningCard}>
-        <Text style={styles.warningText}>
-          ⚠️ False reports will negatively affect YOUR trust score.
-          Only report genuine violations.
-        </Text>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <Ionicons name="warning-outline" size={20} color="#FFC107" />
+          <Text style={styles.warningText}>
+            False reports are a violation of community guidelines and will negatively affect YOUR team's trust score.
+          </Text>
+        </View>
       </View>
 
       <TouchableOpacity
@@ -144,8 +160,11 @@ export default function ReportTeamScreen() {
         disabled={loading}
       >
         {loading
-          ? <ActivityIndicator color="#000" />
-          : <Text style={styles.submitBtnText}>Submit Report</Text>
+          ? <ActivityIndicator color="#FFF" />
+          : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="send" size={18} color="#FFF" />
+              <Text style={styles.submitBtnText}>Submit Report</Text>
+            </View>
         }
       </TouchableOpacity>
     </ScrollView>
@@ -154,30 +173,31 @@ export default function ReportTeamScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.dark.background },
+  container: { flex: 1, backgroundColor: 'transparent' },
   content: { padding: Spacing.lg },
   backBtn: { marginBottom: Spacing.md },
-  backText: { color: Colors.dark.tint, fontSize: FontSizes.md },
-  pageTitle: { fontSize: FontSizes.xxl, fontWeight: FontWeights.bold, color: Colors.dark.text, marginBottom: Spacing.lg },
-  reportedCard: { backgroundColor: '#FF444420', borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.xl, borderWidth: 1, borderColor: '#FF4444' },
-  reportedLabel: { color: '#FF4444', fontSize: FontSizes.xs, fontWeight: FontWeights.semibold },
-  reportedTeam: { color: Colors.dark.text, fontSize: FontSizes.lg, fontWeight: FontWeights.bold, marginTop: 2 },
-  reportedNote: { color: Colors.dark.textSecondary, fontSize: FontSizes.xs, marginTop: Spacing.sm },
-  sectionTitle: { color: Colors.dark.text, fontSize: FontSizes.md, fontWeight: FontWeights.bold, marginBottom: Spacing.md },
+  backText: { color: Colors.dark.tint, fontSize: FontSizes.md, fontWeight: FontWeights.semibold },
+  pageTitle: { fontSize: FontSizes.xxl, fontWeight: FontWeights.bold, color: '#fff', marginBottom: Spacing.lg },
+  reportedCard: { backgroundColor: 'rgba(255,68,68,0.05)', borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.xl, borderWidth: 1, borderColor: 'rgba(255,68,68,0.2)' },
+  reportedLabel: { color: '#FF4444', fontSize: FontSizes.xs, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1 },
+  reportedTeam: { color: '#fff', fontSize: 24, fontWeight: '900', marginTop: 8 },
+  noteBox: { flexDirection: 'row', gap: 8, marginTop: 12, alignItems: 'center' },
+  reportedNote: { color: 'rgba(255,255,255,0.4)', fontSize: 11, flex: 1 },
+  sectionTitle: { color: '#aaa', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12 },
   reasonList: { gap: Spacing.sm, marginBottom: Spacing.xl },
-  reasonBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: Colors.dark.card, borderRadius: BorderRadius.md, padding: Spacing.md, borderWidth: 1, borderColor: Colors.dark.border },
-  reasonBtnActive: { borderColor: '#FF4444', backgroundColor: '#FF444410' },
-  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: Colors.dark.border },
+  reasonBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: BorderRadius.md, padding: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  reasonBtnActive: { borderColor: 'rgba(255,68,68,0.5)', backgroundColor: 'rgba(255,68,68,0.05)' },
+  radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)', marginLeft: 'auto' },
   radioActive: { borderColor: '#FF4444', backgroundColor: '#FF4444' },
-  reasonText: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm, flex: 1 },
-  reasonTextActive: { color: Colors.dark.text },
-  detailsInput: { backgroundColor: Colors.dark.card, borderRadius: BorderRadius.md, padding: Spacing.md, color: Colors.dark.text, fontSize: FontSizes.md, borderWidth: 1, borderColor: Colors.dark.border, height: 100, textAlignVertical: 'top', marginBottom: Spacing.lg },
-  proofCard: { backgroundColor: Colors.dark.card, borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.dark.border },
-  proofTitle: { color: Colors.dark.text, fontSize: FontSizes.sm, fontWeight: FontWeights.bold, marginBottom: Spacing.xs },
-  proofText: { color: Colors.dark.textSecondary, fontSize: FontSizes.xs, lineHeight: 18 },
-  warningCard: { backgroundColor: '#FFC10715', borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.lg, borderWidth: 1, borderColor: '#FFC107' },
-  warningText: { color: '#FFC107', fontSize: FontSizes.xs, lineHeight: 18 },
-  submitBtn: { backgroundColor: '#FF4444', borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center' },
+  reasonText: { color: '#666', fontSize: FontSizes.sm, flex: 1, fontWeight: 'bold' },
+  reasonTextActive: { color: '#fff' },
+  detailsInput: { backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: BorderRadius.md, padding: Spacing.md, color: '#fff', fontSize: FontSizes.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', height: 120, textAlignVertical: 'top', marginBottom: Spacing.lg },
+  proofCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  proofTitle: { color: '#fff', fontSize: FontSizes.sm, fontWeight: 'bold' },
+  proofText: { color: '#666', fontSize: 12, lineHeight: 18, marginTop: 4 },
+  warningCard: { backgroundColor: 'rgba(255,193,7,0.05)', borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.xl, borderWidth: 1, borderColor: 'rgba(255,193,7,0.2)' },
+  warningText: { color: '#FFC107', fontSize: 11, lineHeight: 18, flex: 1, fontWeight: 'bold' },
+  submitBtn: { backgroundColor: '#FF4444', borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center', shadowColor: '#FF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
   submitBtnDisabled: { opacity: 0.6 },
-  submitBtnText: { color: '#FFF', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
+  submitBtnText: { color: '#FFF', fontSize: FontSizes.md, fontWeight: '800' },
 });

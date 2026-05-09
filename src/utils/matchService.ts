@@ -1,5 +1,5 @@
-import { doc, updateDoc, getDoc, collection, addDoc } from 'firebase/firestore';
-import { db } from '@/src/config/firebase';
+import { doc, updateDoc, getDoc, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { db, auth } from '@/src/config/firebase';
 
 const sendNotification = async (toUserId: string, data: any) => {
   await addDoc(collection(db, 'notifications'), {
@@ -149,6 +149,87 @@ export const notifyChallengeAccepted = async (challengeId: string) => {
       matchTime: data.time,
       challengeId,
     });
+  }
+};
+
+export const sendScoreReminders = async (teamId: string): Promise<void> => {
+  try {
+    const [q1, q2] = await Promise.all([
+      getDocs(query(collection(db, 'challenges'), where('fromTeamId', '==', teamId), where('status', '==', 'accepted'))),
+      getDocs(query(collection(db, 'challenges'), where('toTeamId', '==', teamId), where('status', '==', 'accepted'))),
+    ]);
+    
+    const now = Date.now();
+    const MONTHS: Record<string, number> = {
+      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+    };
+
+    for (const m of [...q1.docs, ...q2.docs]) {
+      const data = m.data();
+      const matchId = m.id;
+      
+      // Check if this captain already submitted
+      const isHome = data.fromTeamId === teamId;
+      const alreadySubmitted = isHome ? !!data.homeScoreSubmitted : !!data.awayScoreSubmitted;
+      if (alreadySubmitted) continue;
+
+      // Parse match time
+      try {
+        let cleanDate = data.date.replace(/^[a-zA-Z]+\s*,\s*/i, '').trim();
+        const dateParts = cleanDate.split(' ');
+        const day = parseInt(dateParts[0]);
+        const monthStr = dateParts[1]?.toLowerCase().substring(0, 3);
+        const year = parseInt(dateParts[2]) || new Date().getFullYear();
+        const month = MONTHS[monthStr];
+        let hours = 0, minutes = 0;
+        if (data.time) {
+          const timeClean = data.time.trim();
+          const timeParts = timeClean.split(':');
+          hours = parseInt(timeParts[0]);
+          minutes = parseInt(timeParts[1]);
+          const isPM = timeClean.toUpperCase().includes('PM');
+          if (isPM && hours !== 12) hours += 12;
+        }
+        
+        if (isNaN(day) || month === undefined) continue;
+        const matchDate = new Date(year, month, day, hours, minutes, 0);
+        
+        // If match ended > 1 hour ago
+        if (now - matchDate.getTime() > 60 * 60 * 1000) {
+          // Check if we already sent a reminder recently (e.g., in the last 24h)
+          // For simplicity, we'll just check if a reminder notification exists for this match
+          const notifSnap = await getDocs(query(
+            collection(db, 'notifications'),
+            where('toUserId', '==', auth.currentUser?.uid),
+            where('type', '==', 'score_reminder'),
+            where('challengeId', '==', matchId)
+          ));
+
+          if (notifSnap.empty) {
+            const teamDoc = await getDoc(doc(db, 'teams', teamId));
+            const captainId = teamDoc.data()?.captainId;
+            if (captainId) {
+              await addDoc(collection(db, 'notifications'), {
+                type: 'score_reminder',
+                toUserId: captainId,
+                opponentTeamName: isHome ? data.toTeamName : data.fromTeamName,
+                matchDate: data.date,
+                matchTime: data.time,
+                challengeId: matchId,
+                status: 'pending',
+                read: false,
+                createdAt: new Date().toISOString(),
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Reminder parse error:', e);
+      }
+    }
+  } catch (e) {
+    console.error('sendScoreReminders error:', e);
   }
 };
 

@@ -1,233 +1,127 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
+import {View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { auth } from '@/src/config/firebase';
+import { auth, db } from '@/src/config/firebase';
 import { createTeam } from '@/src/utils/teamService';
+import { doc, getDoc } from 'firebase/firestore';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
-import ChevronBackground from '@/src/components/ChevronBackground';
+import PremiumBackground from '@/src/components/PremiumBackground';
+import { Ionicons } from '@expo/vector-icons';
 
-const EMIRATES = ['Sharjah', 'Dubai', 'Ajman'];
-const FORMATS = ['5-a-side', '7-a-side', '11-a-side'];
-const SKILL_LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
 const TEAM_COLORS = ['#00E676', '#FF6B6B', '#4FC3F7', '#FFD54F', '#CE93D8', '#FF8A65'];
+const FORMATS = ['5-a-side', '7-a-side', '11-a-side'];
+const EMIRATES = ['Sharjah', 'Dubai', 'Ajman'];
+const SKILL_LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
 
 export default function CreateTeamScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [teamName, setTeamName] = useState('');
-  const [selectedEmirate, setSelectedEmirate] = useState('Sharjah');
-  const [selectedFormat, setSelectedFormat] = useState('7-a-side');
-  const [selectedSkill, setSelectedSkill] = useState('Intermediate');
-  const [selectedColor, setSelectedColor] = useState('#00E676');
+  const [name, setName] = useState('');
+  const [color, setColor] = useState(TEAM_COLORS[0]);
+  const [format, setFormat] = useState(FORMATS[1]);
+  const [emirate, setEmirate] = useState(EMIRATES[0]);
+  const [skill, setSkill] = useState(SKILL_LEVELS[1]);
 
   const handleCreate = async () => {
-    if (!teamName.trim()) {
-      Alert.alert('Error', 'Please enter a team name');
-      return;
-    }
-    const user = auth.currentUser;
-    if (!user) {
-      Alert.alert('Error', 'You must be logged in');
-      return;
-    }
+    if (!name.trim()) { Alert.alert('Error', 'Please enter a team name'); return; }
     setLoading(true);
     try {
-      await createTeam({
-        name: teamName.trim(),
+      const user = auth.currentUser;
+      if (!user) throw new Error('Not logged in');
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userData = userDoc.data();
+      const captainName = `${userData?.firstName || ''} ${userData?.lastName || ''}`.trim() || userData?.name || 'Captain';
+      
+      await createTeam({ 
+        name: name.trim(), 
+        color, 
+        format: format as any, 
+        emirate: emirate as any, 
+        skillLevel: skill as any,
         captainId: user.uid,
-        captainName: user.displayName || 'Captain',
-        emirate: selectedEmirate as any,
-        format: selectedFormat as any,
-        skillLevel: selectedSkill as any,
-        color: selectedColor,
+        captainName: captainName,
       }, user.uid);
-      Alert.alert('Success!', 'Your team has been created!', [
-        { text: 'OK', onPress: () => router.replace('/(tabs)/my-team') }
-      ]);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to create team. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+      Alert.alert('Success!', 'Your team has been created.', [{ text: 'OK', onPress: () => router.replace('/(tabs)/my-team') }]);
+    } catch (e) { Alert.alert('Error', 'Could not create team'); } finally { setLoading(false); }
   };
 
-return (
-  <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
-    <ChevronBackground />
-    <ScrollView
-      style={[styles.container, { backgroundColor: 'transparent' }]} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
+  return (
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
+      <ScrollView 
+        style={{ flex: 1, backgroundColor: 'transparent' }}
+        contentContainerStyle={{ padding: Spacing.lg, paddingTop: insets.top + Spacing.md, paddingBottom: 60 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 20 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="arrow-back" size={20} color={Colors.dark.tint} />
+            <Text style={{ color: Colors.dark.tint, fontWeight: 'bold' }}>Back</Text>
+          </View>
         </TouchableOpacity>
         <Text style={styles.title}>Create Team</Text>
-      </View>
+        <Text style={styles.subtitle}>Build your squad and start challenging others</Text>
 
-      {/* Team Name */}
-      <View style={styles.section}>
-        <Text style={styles.label}>Team Name</Text>
-        <TextInput
-          style={styles.input}
-          value={teamName}
-          onChangeText={setTeamName}
-          placeholder="e.g. Desert Kings FC"
-          placeholderTextColor={Colors.dark.textSecondary}
-          maxLength={30}
-        />
-      </View>
+        <View style={styles.card}>
+          <Text style={styles.label}>Team Name</Text>
+          <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Enter name" placeholderTextColor="#666" />
 
-      {/* Team Color */}
-      <View style={styles.section}>
-        <Text style={styles.label}>Team Color</Text>
-        <View style={styles.colorRow}>
-          {TEAM_COLORS.map(color => (
-            <TouchableOpacity
-              key={color}
-              style={[styles.colorDot, { backgroundColor: color },
-                selectedColor === color && styles.colorDotSelected]}
-              onPress={() => setSelectedColor(color)}
-            />
-          ))}
+          <Text style={styles.label}>Identity Color</Text>
+          <View style={styles.colorRow}>
+            {TEAM_COLORS.map(c => (
+              <TouchableOpacity key={c} style={[styles.colorDot, { backgroundColor: c }, color === c && { borderWidth: 3, borderColor: '#fff' }]} onPress={() => setColor(c)} />
+            ))}
+          </View>
+
+          <Text style={styles.label}>Primary Format</Text>
+          <View style={styles.optionRow}>
+            {FORMATS.map(f => (
+              <TouchableOpacity key={f} style={[styles.optionBtn, format === f && styles.optionBtnActive]} onPress={() => setFormat(f)}><Text style={[styles.optionText, format === f && styles.optionTextActive]}>{f}</Text></TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Emirate Base</Text>
+          <View style={styles.optionRow}>
+            {EMIRATES.map(e => (
+              <TouchableOpacity key={e} style={[styles.optionBtn, emirate === e && styles.optionBtnActive]} onPress={() => setEmirate(e)}><Text style={[styles.optionText, emirate === e && styles.optionTextActive]}>{e}</Text></TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Squad Level</Text>
+          <View style={styles.optionRow}>
+            {SKILL_LEVELS.map(s => (
+              <TouchableOpacity key={s} style={[styles.optionBtn, skill === s && styles.optionBtnActive]} onPress={() => setSkill(s)}><Text style={[styles.optionText, skill === s && styles.optionTextActive]}>{s}</Text></TouchableOpacity>
+            ))}
+          </View>
         </View>
-      </View>
 
-      {/* Emirate */}
-      <View style={styles.section}>
-        <Text style={styles.label}>Home Emirate</Text>
-        <View style={styles.optionRow}>
-          {EMIRATES.map(e => (
-            <TouchableOpacity
-              key={e}
-              style={[styles.optionBtn, selectedEmirate === e && styles.optionBtnActive]}
-              onPress={() => setSelectedEmirate(e)}
-            >
-              <Text style={[styles.optionText, selectedEmirate === e && styles.optionTextActive]}>
-                {e}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Format */}
-      <View style={styles.section}>
-        <Text style={styles.label}>Format</Text>
-        <View style={styles.optionRow}>
-          {FORMATS.map(f => (
-            <TouchableOpacity
-              key={f}
-              style={[styles.optionBtn, selectedFormat === f && styles.optionBtnActive]}
-              onPress={() => setSelectedFormat(f)}
-            >
-              <Text style={[styles.optionText, selectedFormat === f && styles.optionTextActive]}>
-                {f}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Skill Level */}
-      <View style={styles.section}>
-        <Text style={styles.label}>Skill Level</Text>
-        <View style={styles.optionRow}>
-          {SKILL_LEVELS.map(s => (
-            <TouchableOpacity
-              key={s}
-              style={[styles.optionBtn, selectedSkill === s && styles.optionBtnActive]}
-              onPress={() => setSelectedSkill(s)}
-            >
-              <Text style={[styles.optionText, selectedSkill === s && styles.optionTextActive]}>
-                {s}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Preview */}
-      <View style={styles.preview}>
-        <View style={[styles.previewBadge, { backgroundColor: selectedColor }]}>
-          <Text style={styles.previewBadgeText}>
-            {teamName ? teamName.substring(0, 2).toUpperCase() : 'FC'}
-          </Text>
-        </View>
-        <View>
-          <Text style={styles.previewName}>{teamName || 'Your Team Name'}</Text>
-          <Text style={styles.previewMeta}>{selectedEmirate} · {selectedFormat} · {selectedSkill}</Text>
-        </View>
-      </View>
-
-      {/* Create Button */}
-      <TouchableOpacity
-        style={[styles.createBtn, loading && styles.createBtnDisabled]}
-        onPress={handleCreate}
-        disabled={loading}
-      >
-        {loading
-          ? <ActivityIndicator color="#000" />
-          : <Text style={styles.createBtnText}>Create Team</Text>
-        }
-      </TouchableOpacity>
-    </ScrollView>
-  </View>
+        <TouchableOpacity style={[styles.createBtn, loading && { opacity: 0.7 }]} onPress={handleCreate} disabled={loading}>
+          {loading ? <ActivityIndicator color="#000" /> : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.createBtnText}>Create Team</Text>
+              <Ionicons name="arrow-forward" size={18} color="#000" />
+            </View>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.dark.background },
-  content: { padding: Spacing.lg, paddingBottom: 40 },
-  header: { marginBottom: Spacing.xl },
-  backBtn: { marginBottom: Spacing.sm },
-  backText: { color: Colors.dark.tint, fontSize: FontSizes.md },
-  title: { fontSize: FontSizes.xxl, fontWeight: FontWeights.bold, color: Colors.dark.text },
-  section: { marginBottom: Spacing.lg },
-  label: { fontSize: FontSizes.sm, color: Colors.dark.textSecondary, marginBottom: Spacing.sm, fontWeight: FontWeights.semibold },
-  input: {
-    backgroundColor: Colors.dark.card,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    color: Colors.dark.text,
-    fontSize: FontSizes.md,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  colorRow: { flexDirection: 'row', gap: Spacing.sm },
-  colorDot: { width: 36, height: 36, borderRadius: 18 },
-  colorDotSelected: { borderWidth: 3, borderColor: Colors.dark.text },
-  optionRow: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' },
-  optionBtn: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    backgroundColor: Colors.dark.card,
-  },
-  optionBtnActive: { borderColor: Colors.dark.tint, backgroundColor: Colors.dark.tint + '20' },
-  optionText: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm },
-  optionTextActive: { color: Colors.dark.tint, fontWeight: FontWeights.semibold },
-  preview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    backgroundColor: Colors.dark.card,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  previewBadge: { width: 52, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center' },
-  previewBadgeText: { color: '#000', fontWeight: FontWeights.bold, fontSize: FontSizes.md },
-  previewName: { color: Colors.dark.text, fontSize: FontSizes.md, fontWeight: FontWeights.bold },
-  previewMeta: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm, marginTop: 2 },
-  createBtn: {
-    backgroundColor: Colors.dark.tint,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    alignItems: 'center',
-  },
-  createBtnDisabled: { opacity: 0.6 },
-  createBtnText: { color: '#000', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
+  title: { fontSize: 32, fontWeight: '900', color: '#fff' },
+  subtitle: { color: '#666', fontSize: 14, marginBottom: 24, marginTop: 4 },
+  card: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  label: { color: '#aaa', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, marginTop: 16 },
+  input: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 16, color: '#fff', fontSize: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  colorRow: { flexDirection: 'row', gap: 12 }, colorDot: { width: 32, height: 32, borderRadius: 16 },
+  optionRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  optionBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  optionBtnActive: { backgroundColor: Colors.dark.tint + '20', borderColor: Colors.dark.tint },
+  optionText: { color: '#666', fontSize: 12, fontWeight: 'bold' },
+  optionTextActive: { color: Colors.dark.tint },
+  createBtn: { backgroundColor: Colors.dark.tint, padding: 18, borderRadius: 16, alignItems: 'center', marginTop: 32, shadowColor: Colors.dark.tint, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
+  createBtnText: { color: '#000', fontSize: 16, fontWeight: '800' },
 });

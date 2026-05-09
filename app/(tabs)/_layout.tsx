@@ -12,7 +12,6 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors.dark.tint,
         tabBarInactiveTintColor: Colors.dark.tabIconDefault,
         headerShown: false,
-        sceneContainerStyle: { backgroundColor: '#0D0D0D' },
         tabBarStyle: {
           backgroundColor: Colors.dark.card,
           borderTopColor: Colors.dark.border,

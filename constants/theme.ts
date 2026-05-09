@@ -4,6 +4,23 @@
  */
 
 export const Colors = {
+  light: {
+    background: '#0D0D0D',
+    card: '#1A1A1A',
+    tint: '#00E676',
+    text: '#FFFFFF',
+    textSecondary: '#AAAAAA',
+    border: '#2A2A2A',
+    inputBackground: '#1A1A1A',
+    inputBorder: '#2A2A2A',
+    inputBorderFocused: '#00E676',
+    error: '#FF4444',
+    success: '#00E676',
+    warning: '#FFC107',
+    icon: '#00E676',
+    tabIconDefault: '#555555',
+    tabIconSelected: '#00E676',
+  },
   dark: {
     background: '#0D0D0D',      // Main app background (black)
     card: '#1A1A1A',            // Card/container background (dark gray)
@@ -21,7 +38,7 @@ export const Colors = {
     tabIconDefault: '#555555',
     tabIconSelected: '#00E676',
   },
-};
+} as const;
 
 export const Spacing = {
   xs: 4,
@@ -30,14 +47,14 @@ export const Spacing = {
   lg: 24,
   xl: 32,
   xxl: 48,
-};
+} as const;
 
 export const BorderRadius = {
   sm: 8,
   md: 12,       // Default rounded corners
   lg: 16,
   xl: 24,
-};
+} as const;
 
 export const FontSizes = {
   xs: 12,
@@ -46,11 +63,11 @@ export const FontSizes = {
   lg: 20,
   xl: 24,       // Headings
   xxl: 32,      // Large titles
-};
+} as const;
 
 export const FontWeights = {
   regular: '400',
   medium: '500',
   semibold: '600',
   bold: '700',
-};
+} as const;

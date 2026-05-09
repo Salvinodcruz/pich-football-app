@@ -11,16 +11,16 @@ export const sendFriendRequest = async (
   fromPhotoURL: string | null,
   toUserId: string,
 ): Promise<void> => {
-  // Check not already friends
+  // Check not already friends or pending
   const existing = await getDocs(
     query(collection(db, 'friendships'),
       where('users', 'array-contains', fromUserId))
   );
-  const alreadyFriends = existing.docs.some(d => {
+  const alreadyExists = existing.docs.some(d => {
     const data = d.data();
-    return data.users.includes(toUserId) && data.status === 'accepted';
+    return data.users.includes(toUserId) && (data.status === 'accepted' || data.status === 'pending');
   });
-  if (alreadyFriends) throw new Error('Already friends');
+  if (alreadyExists) throw new Error('Friend request already sent or you are already friends');
 
   // Send notification
   await addDoc(collection(db, 'notifications'), {

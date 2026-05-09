@@ -9,7 +9,8 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/src/config/firebase';
 import { createTournament } from '@/src/utils/tournamentService';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
-import ChevronBackground from '@/src/components/ChevronBackground';
+import PremiumBackground from '@/src/components/PremiumBackground';
+import { Ionicons } from '@expo/vector-icons';
 
 const FORMATS = ['5-a-side', '7-a-side', '11-a-side'];
 const EMIRATES = ['Sharjah', 'Dubai', 'Ajman'];
@@ -84,7 +85,7 @@ export default function CreateTournamentScreen() {
         venue: finalVenue.trim(),
         entryFee: parseInt(entryFee) || 0,
       }, user.uid, teamId);
-      Alert.alert('Tournament Created! 🏆', `${name} is now live!`, [
+      Alert.alert('Tournament Created!', `${name} is now live!`, [
         { text: 'OK', onPress: () => router.replace('/(tabs)/tournaments') }
       ]);
     } catch (e) {
@@ -111,17 +112,21 @@ export default function CreateTournamentScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
-      <ChevronBackground />
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
       <ScrollView
         style={[styles.container, { backgroundColor: 'transparent' }]}
         contentContainerStyle={[styles.content, {
           paddingTop: insets.top + Spacing.md,
           paddingBottom: insets.bottom + 40,
         }]}
+        showsVerticalScrollIndicator={false}
       >
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="arrow-back" size={20} color={Colors.dark.tint} />
+            <Text style={styles.backText}>Back</Text>
+          </View>
         </TouchableOpacity>
         <Text style={styles.pageTitle}>Create Tournament</Text>
 
@@ -208,9 +213,9 @@ export default function CreateTournamentScreen() {
             <Text style={styles.stepTitle}>Start Date</Text>
           </View>
           <TouchableOpacity style={styles.pickerTrigger} onPress={() => setShowDatePicker(true)}>
-            <Text style={styles.pickerTriggerIcon}>📅</Text>
+            <Ionicons name="calendar-outline" size={18} color={Colors.dark.tint} />
             <Text style={styles.pickerTriggerText}>{dateString}</Text>
-            <Text style={styles.pickerTriggerArrow}>▾</Text>
+            <Ionicons name="chevron-down" size={16} color={Colors.dark.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -236,12 +241,13 @@ export default function CreateTournamentScreen() {
                   }
                 }}
               >
-                <Text style={styles.venueIcon}>📍</Text>
+                <Ionicons name="location-outline" size={14} color={venue === v && !showCustomVenue ? Colors.dark.tint : Colors.dark.textSecondary} />
                 <Text style={[styles.venueText, venue === v && !showCustomVenue && styles.venueTextActive]}>
                   {v}
                 </Text>
-                {venue === v && !showCustomVenue && <Text style={styles.venueCheck}>✓</Text>}
-                {v === 'Custom...' && showCustomVenue && <Text style={styles.venueCheck}>✓</Text>}
+                {((venue === v && !showCustomVenue) || (v === 'Custom...' && showCustomVenue)) && (
+                  <Ionicons name="checkmark-circle" size={16} color={Colors.dark.tint} />
+                )}
               </TouchableOpacity>
             ))}
           </View>
@@ -260,11 +266,23 @@ export default function CreateTournamentScreen() {
         {/* Summary */}
         {name.trim() && finalVenue.trim() && (
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>🏆 {name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <Ionicons name="trophy-outline" size={18} color={Colors.dark.tint} />
+              <Text style={styles.summaryTitle}>{name}</Text>
+            </View>
             <Text style={styles.summaryMeta}>{format} · {emirate} · {maxTeams} teams</Text>
-            <Text style={styles.summaryMeta}>📅 {dateString}</Text>
-            <Text style={styles.summaryMeta}>📍 {finalVenue}</Text>
-            <Text style={styles.summaryMeta}>💰 {entryFee === '0' ? 'Free entry' : `AED ${entryFee}`}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="calendar-outline" size={14} color={Colors.dark.textSecondary} />
+              <Text style={styles.summaryMeta}>{dateString}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="location-outline" size={14} color={Colors.dark.textSecondary} />
+              <Text style={styles.summaryMeta}>{finalVenue}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="cash-outline" size={14} color={Colors.dark.textSecondary} />
+              <Text style={styles.summaryMeta}>{entryFee === '0' ? 'Free entry' : `AED ${entryFee}`}</Text>
+            </View>
           </View>
         )}
 
@@ -275,7 +293,10 @@ export default function CreateTournamentScreen() {
         >
           {loading
             ? <ActivityIndicator color="#000" />
-            : <Text style={styles.createBtnText}>🏆 Create Tournament</Text>
+            : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="trophy" size={18} color="#000" />
+                <Text style={styles.createBtnText}>Create Tournament</Text>
+              </View>
           }
         </TouchableOpacity>
       </ScrollView>
@@ -305,7 +326,10 @@ export default function CreateTournamentScreen() {
               </View>
             </View>
             <View style={styles.pickerPreview}>
-              <Text style={styles.pickerPreviewText}>📅 {dateString}</Text>
+               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="calendar" size={18} color={Colors.dark.tint} />
+                <Text style={styles.pickerPreviewText}>{dateString}</Text>
+              </View>
             </View>
           </View>
         </View>

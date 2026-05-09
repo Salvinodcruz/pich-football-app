@@ -15,7 +15,8 @@ import {
   acceptChallenge, declineChallenge,
 } from '@/src/utils/challengeService';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
-import ChevronBackground from '@/src/components/ChevronBackground';
+import PremiumBackground from '@/src/components/PremiumBackground';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function ChallengesScreen() {
   const insets = useSafeAreaInsets();
@@ -220,26 +221,46 @@ export default function ChallengesScreen() {
       </View>
 
       <View style={styles.details}>
-        <Text style={styles.detailText}>📅 {challenge.date} at {challenge.time}</Text>
-        <Text style={styles.detailText} numberOfLines={1}>📍 {challenge.venue}</Text>
-        {challenge.message ? <Text style={styles.messageText}>💬 "{challenge.message}"</Text> : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="calendar-outline" size={14} color={Colors.dark.textSecondary} />
+          <Text style={styles.detailText}>{challenge.date} at {challenge.time}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="location-outline" size={14} color={Colors.dark.textSecondary} />
+          <Text style={styles.detailText} numberOfLines={1}>{challenge.venue}</Text>
+        </View>
+        {challenge.message ? (
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
+            <Ionicons name="chatbubble-outline" size={14} color={Colors.dark.textSecondary} style={{ marginTop: 2 }} />
+            <Text style={styles.messageText}>"{challenge.message}"</Text>
+          </View>
+        ) : null}
       </View>
 
       {/* Incoming pending */}
       {isIncoming && !isAccepted && (
         <View style={styles.actions}>
           <TouchableOpacity style={styles.acceptBtn} onPress={() => handleAccept(challenge.id, challenge.fromTeamName)}>
-            <Text style={styles.acceptBtnText}>✓ Accept</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="checkmark-circle-outline" size={18} color="#000" />
+              <Text style={styles.acceptBtnText}>Accept</Text>
+            </View>
           </TouchableOpacity>
           <TouchableOpacity style={styles.declineBtn} onPress={() => handleDecline(challenge.id)}>
-            <Text style={styles.declineBtnText}>✕ Decline</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="close-circle-outline" size={18} color="#FF4444" />
+              <Text style={styles.declineBtnText}>Decline</Text>
+            </View>
           </TouchableOpacity>
         </View>
       )}
 
       {/* Outgoing pending */}
       {!isIncoming && !isAccepted && (
-        <Text style={styles.waitingText}>⏳ Waiting for response...</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center', paddingTop: Spacing.xs }}>
+          <Ionicons name="time-outline" size={16} color={Colors.dark.textSecondary} />
+          <Text style={styles.waitingText}>Waiting for response...</Text>
+        </View>
       )}
 
       {/* Accepted */}
@@ -257,31 +278,44 @@ export default function ChallengesScreen() {
               }
             })}
           >
-            <Text style={styles.submitResultBtnText}>📋 Submit Result</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="clipboard-outline" size={18} color={Colors.dark.tint} />
+              <Text style={styles.submitResultBtnText}>Submit Result</Text>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.chatBtn}
             onPress={() => router.push({
-              pathname: `/chat/${challenge.id}`,
+              pathname: `/chat/${challenge.id}` as any,
               params: { opponentName: isIncoming ? challenge.fromTeamName : challenge.toTeamName }
             })}
           >
-            <Text style={styles.chatBtnText}>💬 Message Captain</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="chatbubble-outline" size={18} color={Colors.dark.textSecondary} />
+              <Text style={styles.chatBtnText}>Message Captain</Text>
+            </View>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.cancelMatchBtn, challenge.cancelRequest && styles.cancelMatchBtnWarning]}
             onPress={() => handleCancelMatch(challenge)}
           >
-            <Text style={[styles.cancelMatchBtnText, challenge.cancelRequest && styles.cancelMatchBtnTextWarning]}>
-              {challenge.cancelRequest
-                ? challenge.cancelRequest.teamId === teamId
-                  ? '⏳ Cancel Requested...'
-                  : '⚠️ Confirm Cancel'
-                : '✕ Cancel Match'
-              }
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons 
+                name={challenge.cancelRequest ? "alert-circle-outline" : "close-outline"} 
+                size={18} 
+                color={challenge.cancelRequest ? "#FF4444" : Colors.dark.textSecondary} 
+              />
+              <Text style={[styles.cancelMatchBtnText, challenge.cancelRequest && styles.cancelMatchBtnTextWarning]}>
+                {challenge.cancelRequest
+                  ? challenge.cancelRequest.teamId === teamId
+                    ? 'Cancel Requested...'
+                    : 'Confirm Cancel'
+                  : 'Cancel Match'
+                }
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
       )}
@@ -291,20 +325,24 @@ export default function ChallengesScreen() {
   const currentList = tab === 'incoming' ? incoming : tab === 'outgoing' ? outgoing : accepted;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
-      <ChevronBackground />
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
       <ScrollView
-          style={[styles.container, { backgroundColor: 'transparent' }]}
+          style={{ flex: 1, backgroundColor: 'transparent' }}
           contentContainerStyle={[styles.content, {
           paddingTop: insets.top + Spacing.md,
           paddingBottom: insets.bottom + 40,
         }]}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={false} onRefresh={() => {}} tintColor={Colors.dark.tint} />
         }
       >
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Back</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="arrow-back" size={20} color={Colors.dark.tint} />
+            <Text style={styles.backText}>Back</Text>
+          </View>
         </TouchableOpacity>
         <Text style={styles.pageTitle}>Challenges</Text>
 
@@ -339,9 +377,11 @@ export default function ChallengesScreen() {
           <View style={styles.list}>
             {currentList.length === 0 ? (
               <View style={styles.empty}>
-                <Text style={styles.emptyIcon}>
-                  {tab === 'incoming' ? '⚡' : tab === 'outgoing' ? '📤' : '✅'}
-                </Text>
+                <View style={{ marginBottom: Spacing.md }}>
+                  {tab === 'incoming' && <Ionicons name="flash" size={48} color={Colors.dark.tint} />}
+                  {tab === 'outgoing' && <Ionicons name="send" size={48} color={Colors.dark.tint} />}
+                  {tab === 'accepted' && <Ionicons name="checkmark-circle" size={48} color={Colors.dark.tint} />}
+                </View>
                 <Text style={styles.emptyText}>
                   {tab === 'incoming' ? 'No incoming challenges' : tab === 'outgoing' ? 'No outgoing challenges' : 'No confirmed matches yet'}
                 </Text>

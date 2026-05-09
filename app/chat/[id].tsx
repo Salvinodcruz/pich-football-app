@@ -11,7 +11,8 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
-import ChevronBackground from '@/src/components/ChevronBackground';
+import PremiumBackground from '@/src/components/PremiumBackground';
+import { Ionicons } from '@expo/vector-icons';
 
 
 export default function ChatScreen() {
@@ -75,15 +76,15 @@ export default function ChatScreen() {
 
 return (
   <KeyboardAvoidingView
-    style={[styles.container, { backgroundColor: '#0A0A0A' }]}
+    style={[styles.container, { backgroundColor: '#050505' }]}
     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     keyboardVerticalOffset={0}
   >
-    <ChevronBackground />
+    <PremiumBackground />
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>←</Text>
+          <Ionicons name="chevron-back" size={24} color={Colors.dark.tint} />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle}>Captain Chat</Text>
@@ -94,13 +95,14 @@ return (
       {/* Messages */}
       <ScrollView
         ref={scrollRef}
+        showsVerticalScrollIndicator={false}
         style={styles.messages}
         contentContainerStyle={styles.messagesContent}
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
       >
         {messages.length === 0 ? (
           <View style={styles.emptyChat}>
-            <Text style={styles.emptyChatIcon}>💬</Text>
+            <Ionicons name="chatbubble-ellipses-outline" size={64} color="rgba(255,255,255,0.1)" />
             <Text style={styles.emptyChatText}>No messages yet</Text>
             <Text style={styles.emptyChatSubtext}>
               Use this chat to coordinate venue details, timing, and match info
@@ -132,7 +134,7 @@ return (
       </ScrollView>
 
       {/* Input */}
-      <View style={[styles.inputRow, { paddingBottom: insets.bottom + Spacing.sm }]}>
+      <View style={[styles.inputRow, { paddingBottom: insets.bottom + Spacing.md }]}>
         <TextInput
           style={styles.input}
           value={text}
@@ -147,7 +149,7 @@ return (
           onPress={sendMessage}
           disabled={!text.trim() || sending}
         >
-          <Text style={styles.sendBtnText}>→</Text>
+          <Ionicons name="send" size={20} color="#000" />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -155,30 +157,27 @@ return (
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0A0A' },
-  header: { backgroundColor: Colors.dark.card, padding: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.dark.border },
+  container: { flex: 1, backgroundColor: '#050505' },
+  header: { backgroundColor: 'rgba(255,255,255,0.03)', padding: Spacing.md, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
   backBtn: { padding: Spacing.xs },
-  backText: { color: Colors.dark.tint, fontSize: FontSizes.xl },
   headerInfo: { flex: 1 },
   headerTitle: { color: Colors.dark.text, fontSize: FontSizes.md, fontWeight: FontWeights.bold },
   headerSubtitle: { color: Colors.dark.textSecondary, fontSize: FontSizes.xs },
-  messages: { flex: 1 },
+  messages: { flex: 1, backgroundColor: 'transparent' },
   messagesContent: { padding: Spacing.md, gap: Spacing.sm, paddingBottom: Spacing.xl },
   emptyChat: { alignItems: 'center', marginTop: 80, gap: Spacing.md },
-  emptyChatIcon: { fontSize: 48 },
   emptyChatText: { color: Colors.dark.text, fontSize: FontSizes.lg, fontWeight: FontWeights.bold },
   emptyChatSubtext: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm, textAlign: 'center', paddingHorizontal: Spacing.xl },
-  messageBubble: { maxWidth: '75%', padding: Spacing.sm, borderRadius: BorderRadius.md, gap: 2 },
+  messageBubble: { maxWidth: '75%', padding: Spacing.md, borderRadius: 20, gap: 2 },
   myBubble: { alignSelf: 'flex-end', backgroundColor: Colors.dark.tint },
-  theirBubble: { alignSelf: 'flex-start', backgroundColor: Colors.dark.card, borderWidth: 1, borderColor: Colors.dark.border },
+  theirBubble: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   senderName: { color: Colors.dark.textSecondary, fontSize: FontSizes.xs, fontWeight: FontWeights.semibold },
-  messageText: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm },
+  messageText: { color: Colors.dark.text, fontSize: FontSizes.sm },
   myMessageText: { color: '#000' },
   messageTime: { color: Colors.dark.textSecondary, fontSize: 10, alignSelf: 'flex-end' },
   myMessageTime: { color: '#00000080' },
-  inputRow: { flexDirection: 'row', gap: Spacing.sm, padding: Spacing.md, backgroundColor: Colors.dark.card, borderTopWidth: 1, borderTopColor: Colors.dark.border, alignItems: 'flex-end' },
-  input: { flex: 1, backgroundColor: Colors.dark.background, borderRadius: BorderRadius.md, padding: Spacing.sm, color: Colors.dark.text, fontSize: FontSizes.md, borderWidth: 1, borderColor: Colors.dark.border, maxHeight: 100 },
+  inputRow: { flexDirection: 'row', gap: Spacing.sm, padding: Spacing.md, backgroundColor: 'rgba(255,255,255,0.03)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', alignItems: 'flex-end' },
+  input: { flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: Spacing.sm, color: Colors.dark.text, fontSize: FontSizes.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', maxHeight: 100 },
   sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.dark.tint, justifyContent: 'center', alignItems: 'center' },
   sendBtnDisabled: { opacity: 0.4 },
-  sendBtnText: { color: '#000', fontSize: FontSizes.lg, fontWeight: FontWeights.bold },
 });

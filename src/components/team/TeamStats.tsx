@@ -6,6 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Colors, Spacing, BorderRadius, FontSizes, FontWeights } from '@/constants/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 interface TeamStatsProps {
   wins: number;
@@ -54,7 +55,10 @@ export default function TeamStats({ wins, losses, rating, trustScore, matchesPla
           </Text>
           <Text style={styles.statLabel}>Trust Score</Text>
           {trustScore < 30 && (
-            <Text style={styles.warningText}>⚠️ Low trust</Text>
+            <View style={styles.warningContainer}>
+              <Ionicons name="warning-outline" size={12} color="#FF4444" />
+              <Text style={styles.warningText}>Low trust</Text>
+            </View>
           )}
         </View>
       </View>
@@ -64,11 +68,11 @@ export default function TeamStats({ wins, losses, rating, trustScore, matchesPla
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.dark.card,
-    borderRadius: BorderRadius.md,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 20,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   sectionTitle: {
     fontSize: FontSizes.md,
@@ -86,8 +90,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingVertical: Spacing.md,
-    backgroundColor: Colors.dark.background,
-    borderRadius: BorderRadius.sm,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.02)',
   },
   statValue: {
     fontSize: FontSizes.xl,
@@ -105,9 +111,14 @@ const styles = StyleSheet.create({
     color: Colors.dark.textSecondary,
     marginTop: 2,
   },
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
   warningText: {
     fontSize: FontSizes.xs,
     color: '#FF4444',
-    marginTop: 2,
   },
 });

@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
-import ChevronBackground from '@/src/components/ChevronBackground';
+import PremiumBackground from '@/src/components/PremiumBackground';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function MatchMapScreen() {
   const insets = useSafeAreaInsets();
@@ -24,36 +25,43 @@ export default function MatchMapScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
-      <ChevronBackground />
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backText}>← Back</Text>
+          <TouchableOpacity onPress={() => router.back()} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="arrow-back" size={20} color={Colors.dark.tint} />
+            <Text style={styles.backText}>Back</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Venue Location</Text>
           <View style={{ width: 50 }} />
         </View>
 
       <View style={styles.venueCard}>
-        <Text style={styles.venueIcon}>📍</Text>
+        <Ionicons name="location" size={40} color={Colors.dark.tint} />
         <Text style={styles.venueName}>{name || venue}</Text>
-        <Text style={styles.venueSubtext}>UAE</Text>
+        <Text style={styles.venueSubtext}>United Arab Emirates</Text>
       </View>
 
       <View style={styles.mapPlaceholder}>
-        <Text style={styles.mapIcon}>🗺️</Text>
+        <Ionicons name="map-outline" size={64} color="#333" />
         <Text style={styles.mapText}>Open in Maps to see exact location</Text>
       </View>
 
       <View style={styles.actions}>
         <TouchableOpacity style={styles.mapsBtn} onPress={openInMaps}>
-          <Text style={styles.mapsBtnText}>
-            {Platform.OS === 'ios' ? '🍎 Open in Apple Maps' : '🗺️ Open in Maps'}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name={Platform.OS === 'ios' ? "logo-apple" : "map"} size={20} color="#000" />
+            <Text style={styles.mapsBtnText}>
+              {Platform.OS === 'ios' ? 'Open in Apple Maps' : 'Open in Maps'}
+            </Text>
+          </View>
         </TouchableOpacity>
         <TouchableOpacity style={styles.googleBtn} onPress={openInGoogleMaps}>
-          <Text style={styles.googleBtnText}>🌐 Open in Google Maps</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="globe-outline" size={20} color={Colors.dark.text} />
+            <Text style={styles.googleBtnText}>Open in Google Maps</Text>
+          </View>
         </TouchableOpacity>
       </View>
     </View>

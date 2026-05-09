@@ -5,12 +5,16 @@ import {
   ScrollView, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/src/config/firebase';
 import { Colors, Spacing, BorderRadius, FontSizes, FontWeights } from '@/constants/theme';
+import PremiumBackground from '@/src/components/PremiumBackground';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function SignupScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -62,147 +66,194 @@ export default function SignupScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={80}
-    >
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        {/* Logo */}
-        <View style={styles.logoContainer}>
-          <Image
-            source={require('../assets/pich images/logo.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
-
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join Pich and find your team</Text>
-        </View>
-
-        {/* Form */}
-        <View style={styles.form}>
-
-          {/* Name Row */}
-          <View style={styles.nameRow}>
-            <TextInput
-              style={[styles.input, styles.nameInput]}
-              placeholder="First Name *"
-              placeholderTextColor={Colors.dark.textSecondary}
-              value={firstName}
-              onChangeText={setFirstName}
-              editable={!loading}
-              autoCapitalize="words"
-            />
-            <TextInput
-              style={[styles.input, styles.nameInput]}
-              placeholder="Last Name *"
-              placeholderTextColor={Colors.dark.textSecondary}
-              value={lastName}
-              onChangeText={setLastName}
-              editable={!loading}
-              autoCapitalize="words"
+        <ScrollView
+          style={{ flex: 1, backgroundColor: 'transparent' }}
+          contentContainerStyle={[styles.scrollContent, {
+            paddingTop: insets.top + 40,
+            paddingBottom: insets.bottom + 40,
+          }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Logo */}
+          <View style={styles.logoContainer}>
+            <Image
+              source={require('../assets/pich images/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
             />
           </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Middle Name (optional)"
-            placeholderTextColor={Colors.dark.textSecondary}
-            value={middleName}
-            onChangeText={setMiddleName}
-            editable={!loading}
-            autoCapitalize="words"
-          />
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Create Account</Text>
+            <Text style={styles.subtitle}>Join Pich and find your team</Text>
+          </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor={Colors.dark.textSecondary}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            editable={!loading}
-          />
+          {/* Form */}
+          <View style={styles.form}>
+            {/* Name Row */}
+            <View style={styles.nameRow}>
+              <View style={[styles.inputContainer, { flex: 1 }]}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="First Name *"
+                  placeholderTextColor={Colors.dark.textSecondary}
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  editable={!loading}
+                  autoCapitalize="words"
+                />
+              </View>
+              <View style={[styles.inputContainer, { flex: 1 }]}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Last Name *"
+                  placeholderTextColor={Colors.dark.textSecondary}
+                  value={lastName}
+                  onChangeText={setLastName}
+                  editable={!loading}
+                  autoCapitalize="words"
+                />
+              </View>
+            </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor={Colors.dark.textSecondary}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            editable={!loading}
-          />
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Middle Name (optional)"
+                placeholderTextColor={Colors.dark.textSecondary}
+                value={middleName}
+                onChangeText={setMiddleName}
+                editable={!loading}
+                autoCapitalize="words"
+              />
+            </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="Confirm Password"
-            placeholderTextColor={Colors.dark.textSecondary}
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-            editable={!loading}
-          />
+            <View style={styles.inputContainer}>
+              <Ionicons name="mail-outline" size={20} color={Colors.dark.textSecondary} style={{ marginRight: 12 }} />
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                placeholderTextColor={Colors.dark.textSecondary}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                editable={!loading}
+              />
+            </View>
 
+            <View style={styles.inputContainer}>
+              <Ionicons name="lock-closed-outline" size={20} color={Colors.dark.textSecondary} style={{ marginRight: 12 }} />
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                placeholderTextColor={Colors.dark.textSecondary}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                editable={!loading}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Ionicons name="shield-checkmark-outline" size={20} color={Colors.dark.textSecondary} style={{ marginRight: 12 }} />
+              <TextInput
+                style={styles.input}
+                placeholder="Confirm Password"
+                placeholderTextColor={Colors.dark.textSecondary}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                editable={!loading}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleSignup}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              {loading
+                ? <ActivityIndicator color="#000" />
+                : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={styles.buttonText}>Create Account</Text>
+                    <Ionicons name="arrow-forward" size={18} color="#000" />
+                  </View>
+              }
+            </TouchableOpacity>
+          </View>
+
+          {/* Login Link */}
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Already have an account? </Text>
+            <TouchableOpacity onPress={() => router.replace('/login')} disabled={loading}>
+              <Text style={styles.link}>Sign In</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Back */}
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSignup}
-            disabled={loading}
-            activeOpacity={0.8}
+            style={styles.backBtn}
+            onPress={() => router.replace('/')}
           >
-            {loading
-              ? <ActivityIndicator color={Colors.dark.background} />
-              : <Text style={styles.buttonText}>Create Account</Text>
-            }
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'center' }}>
+              <Ionicons name="arrow-back" size={16} color={Colors.dark.textSecondary} />
+              <Text style={styles.backText}>Back</Text>
+            </View>
           </TouchableOpacity>
-        </View>
-
-        {/* Login Link */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => router.replace('/login')} disabled={loading}>
-            <Text style={styles.link}>Sign In</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.dark.background },
   scrollView: { flex: 1 },
-  scrollContent: { flexGrow: 1, padding: Spacing.lg },
-  logoContainer: { alignItems: 'center', marginTop: 40, marginBottom: Spacing.lg },
-  logo: { width: 100, height: 100 },
+  scrollContent: { flexGrow: 1, paddingHorizontal: Spacing.lg },
+  logoContainer: { alignItems: 'center', marginBottom: Spacing.lg },
+  logo: { width: 90, height: 90 },
   header: { marginBottom: Spacing.xl },
   title: { fontSize: FontSizes.xxl, fontWeight: FontWeights.bold, color: Colors.dark.text, marginBottom: Spacing.xs },
   subtitle: { fontSize: FontSizes.md, color: Colors.dark.textSecondary },
   form: { gap: Spacing.md },
   nameRow: { flexDirection: 'row', gap: Spacing.sm },
-  nameInput: { flex: 1 },
-  input: {
-    backgroundColor: Colors.dark.card,
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.03)',
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: 'rgba(255,255,255,0.05)',
     borderRadius: BorderRadius.md,
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.md,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: Spacing.md,
     fontSize: FontSizes.md,
     color: Colors.dark.text,
   },
-  button: { backgroundColor: Colors.dark.tint, borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center', marginTop: Spacing.sm },
+  button: { 
+    backgroundColor: Colors.dark.tint, 
+    borderRadius: 50, 
+    padding: Spacing.md, 
+    alignItems: 'center', 
+    marginTop: Spacing.sm 
+  },
   buttonDisabled: { opacity: 0.5 },
-  buttonText: { color: Colors.dark.background, fontSize: FontSizes.md, fontWeight: FontWeights.bold },
-  footer: { flexDirection: 'row', justifyContent: 'center', marginTop: Spacing.lg, marginBottom: Spacing.xl },
+  buttonText: { color: '#000', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
+  footer: { flexDirection: 'row', justifyContent: 'center', marginTop: Spacing.xl },
   footerText: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm },
   link: { color: Colors.dark.tint, fontSize: FontSizes.sm, fontWeight: FontWeights.semibold },
+  backBtn: { marginTop: Spacing.lg, marginBottom: Spacing.xl },
+  backText: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm },
 });

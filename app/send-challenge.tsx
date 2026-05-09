@@ -9,7 +9,8 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/src/config/firebase';
 import { sendChallenge } from '@/src/utils/challengeService';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
-import ChevronBackground from '@/src/components/ChevronBackground';
+import PremiumBackground from '@/src/components/PremiumBackground';
+import { Ionicons } from '@expo/vector-icons';
 
 const FORMATS = ['5-a-side', '7-a-side', '11-a-side'];
 const MATCH_TYPES = ['Friendly', 'Rated'];
@@ -43,7 +44,6 @@ const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'
 const MINUTES = ['00', '15', '30', '45'];
 const PERIODS = ['AM', 'PM'];
 
-// ScrollPicker OUTSIDE component to avoid hooks error
 const ScrollPicker = ({ items, selected, onSelect }: { items: string[], selected: string, onSelect: (v: string) => void }) => (
   <ScrollView style={styles.pickerColumn} showsVerticalScrollIndicator={false}>
     {items.map(item => (
@@ -129,7 +129,7 @@ export default function SendChallengeScreen() {
         venue,
         message: '',
       });
-      Alert.alert('Challenge Sent! ⚡', `Your challenge has been sent to ${toTeamName}.`, [
+      Alert.alert('Challenge Sent!', `Your challenge has been sent to ${toTeamName}.`, [
         { text: 'OK', onPress: () => router.back() }
       ]);
     } catch (e) {
@@ -140,17 +140,21 @@ export default function SendChallengeScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
-      <ChevronBackground />
+    <View style={{ flex: 1, backgroundColor: '#050505' }}>
+      <PremiumBackground />
       <ScrollView
-        style={[styles.container, { backgroundColor: 'transparent' }]}
+        style={{ flex: 1, backgroundColor: 'transparent' }}
         contentContainerStyle={[styles.content, {
           paddingTop: insets.top + Spacing.md,
           paddingBottom: insets.bottom + 40,
         }]}
+        showsVerticalScrollIndicator={false}
       >
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={styles.backText}>← Back</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Ionicons name="arrow-back" size={20} color={Colors.dark.tint} />
+          <Text style={styles.backText}>Back</Text>
+        </View>
       </TouchableOpacity>
       <Text style={styles.pageTitle}>Send Challenge</Text>
 
@@ -196,7 +200,10 @@ export default function SendChallengeScreen() {
           ))}
         </View>
         {matchType === 'Rated' && (
-          <Text style={styles.ratedNote}>⚠️ Rated matches require lineup submission 24hrs before</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.sm }}>
+            <Ionicons name="alert-circle-outline" size={14} color="#FFC107" />
+            <Text style={styles.ratedNote}>Rated matches require lineup submission 24hrs before</Text>
+          </View>
         )}
       </View>
 
@@ -207,9 +214,9 @@ export default function SendChallengeScreen() {
           style={styles.pickerTrigger}
           onPress={() => setShowDatePicker(true)}
         >
-          <Text style={styles.pickerTriggerIcon}>📅</Text>
+          <Ionicons name="calendar-outline" size={18} color={Colors.dark.tint} />
           <Text style={styles.pickerTriggerText}>{dateString}</Text>
-          <Text style={styles.pickerTriggerArrow}>▾</Text>
+          <Ionicons name="chevron-down" size={16} color={Colors.dark.textSecondary} />
         </TouchableOpacity>
       </View>
 
@@ -220,9 +227,9 @@ export default function SendChallengeScreen() {
           style={styles.pickerTrigger}
           onPress={() => setShowTimePicker(true)}
         >
-          <Text style={styles.pickerTriggerIcon}>🕐</Text>
+          <Ionicons name="time-outline" size={18} color={Colors.dark.tint} />
           <Text style={styles.pickerTriggerText}>{timeString}</Text>
-          <Text style={styles.pickerTriggerArrow}>▾</Text>
+          <Ionicons name="chevron-down" size={16} color={Colors.dark.textSecondary} />
         </TouchableOpacity>
       </View>
 
@@ -250,18 +257,18 @@ export default function SendChallengeScreen() {
               style={[styles.venueRow, venue === v && !showCustomVenue && styles.venueRowActive]}
               onPress={() => { setVenue(v); setShowCustomVenue(false); }}
             >
-              <Text style={styles.venuePin}>📍</Text>
+              <Ionicons name="location-outline" size={14} color={venue === v && !showCustomVenue ? Colors.dark.tint : Colors.dark.textSecondary} />
               <Text style={[styles.venueText, venue === v && !showCustomVenue && styles.venueTextActive]} numberOfLines={1}>{v}</Text>
-              {venue === v && !showCustomVenue && <Text style={styles.venueCheck}>✓</Text>}
+              {venue === v && !showCustomVenue && <Ionicons name="checkmark-circle" size={16} color={Colors.dark.tint} />}
             </TouchableOpacity>
           ))}
           <TouchableOpacity
             style={[styles.venueRow, showCustomVenue && styles.venueRowActive]}
             onPress={() => { setShowCustomVenue(true); setVenue(''); }}
           >
-            <Text style={styles.venuePin}>✏️</Text>
+            <Ionicons name="pencil-outline" size={14} color={showCustomVenue ? Colors.dark.tint : Colors.dark.textSecondary} />
             <Text style={[styles.venueText, showCustomVenue && styles.venueTextActive]}>Custom venue...</Text>
-            {showCustomVenue && <Text style={styles.venueCheck}>✓</Text>}
+            {showCustomVenue && <Ionicons name="checkmark-circle" size={16} color={Colors.dark.tint} />}
           </TouchableOpacity>
         </View>
 
@@ -284,7 +291,10 @@ export default function SendChallengeScreen() {
       >
         {loading
           ? <ActivityIndicator color="#000" />
-          : <Text style={styles.sendBtnText}>⚡ Send Challenge</Text>
+          : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="flash" size={18} color="#000" />
+              <Text style={styles.sendBtnText}>Send Challenge</Text>
+            </View>
         }
       </TouchableOpacity>
 
@@ -313,7 +323,10 @@ export default function SendChallengeScreen() {
               </View>
             </View>
             <View style={styles.pickerPreview}>
-              <Text style={styles.pickerPreviewText}>📅 {dateString}</Text>
+               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="calendar" size={18} color={Colors.dark.tint} />
+                <Text style={styles.pickerPreviewText}>{dateString}</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -344,7 +357,10 @@ export default function SendChallengeScreen() {
               </View>
             </View>
             <View style={styles.pickerPreview}>
-              <Text style={styles.pickerPreviewText}>🕐 {timeString}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="time" size={18} color={Colors.dark.tint} />
+                <Text style={styles.pickerPreviewText}>{timeString}</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -373,7 +389,7 @@ const styles = StyleSheet.create({
   optionBtnActive: { borderColor: Colors.dark.tint, backgroundColor: Colors.dark.tint + '20' },
   optionText: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm },
   optionTextActive: { color: Colors.dark.tint, fontWeight: FontWeights.semibold },
-  ratedNote: { color: '#FFC107', fontSize: FontSizes.xs, marginTop: Spacing.sm },
+  ratedNote: { color: '#FFC107', fontSize: FontSizes.xs },
   pickerTrigger: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.dark.card, borderRadius: BorderRadius.md, padding: Spacing.md, borderWidth: 1, borderColor: Colors.dark.border, gap: Spacing.sm },
   pickerTriggerIcon: { fontSize: 18 },
   pickerTriggerText: { flex: 1, color: Colors.dark.text, fontSize: FontSizes.md, fontWeight: FontWeights.semibold },
