@@ -9,6 +9,7 @@ import type { Team } from '@/src/types';
 import * as ImagePicker from 'expo-image-picker';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons } from '@expo/vector-icons';
+import { startConversation } from '@/src/utils/teamService';
 
 const TEAM_COLORS = ['#00E676', '#FF6B6B', '#4FC3F7', '#FFD54F', '#CE93D8', '#FF8A65'];
 const FORMATS = ['5-a-side', '7-a-side', '11-a-side'];
@@ -136,9 +137,10 @@ export default function MyTeamScreen() {
     try {
       const { respondToJoinRequest } = await import('@/src/utils/teamService');
       await respondToJoinRequest(requestId, approve);
-      Alert.alert(approve ? 'Approved!' : 'Denied');
+      if (approve) Alert.alert('Success! ✅', 'Player has been added to your team.');
+      setJoinRequests(prev => prev.filter(r => r.id !== requestId));
       load();
-    } catch (e) { Alert.alert('Error'); }
+    } catch (e) { Alert.alert('Error responding to request'); }
   };
 
   const handleLogoUpload = async () => {
@@ -189,8 +191,9 @@ export default function MyTeamScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: async () => {
         try {
+          const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
           await updateDoc(doc(db, 'teams', team.id), { players: arrayRemove(playerId) });
-          await updateDoc(doc(db, 'users', playerId), { teamId: null });
+          await updateDoc(doc(db, 'users', playerId), { teamId: null, isFreeAgent: true });
           load();
         } catch (e) { Alert.alert('Error'); }
       }}
@@ -315,6 +318,15 @@ export default function MyTeamScreen() {
                     <Text style={styles.playerIdText}>Wants to join</Text>
                   </View>
                   <View style={styles.requestActions}>
+                    <TouchableOpacity 
+                      style={styles.msgBtnSmall} 
+                      onPress={() => {
+                        const chatId = startConversation(auth.currentUser!.uid, req.userId);
+                        router.push({ pathname: '/direct-chat/[id]', params: { id: req.userId, name: req.userName } });
+                      }}
+                    >
+                      <Ionicons name="chatbubble-outline" size={14} color="#fff" />
+                    </TouchableOpacity>
                     <TouchableOpacity style={styles.approveBtn} onPress={() => handleRespondJoin(req.id, true)}>
                       <Ionicons name="checkmark" size={16} color="#000" />
                     </TouchableOpacity>
@@ -524,7 +536,9 @@ const styles = StyleSheet.create({
   msgText: { color: Colors.dark.textSecondary, fontSize: 14 },
   switchBanner: { backgroundColor: 'rgba(79,195,247,0.1)', borderRadius: 8, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(79,195,247,0.3)', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   switchBannerText: { color: '#4FC3F7', fontSize: 12, fontWeight: 'bold' }, switchBannerAction: { color: '#4FC3F7', fontSize: 12, fontWeight: 'bold' },
-  requestActions: { flexDirection: 'row', gap: 8 }, approveBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.dark.tint, justifyContent: 'center', alignItems: 'center' },
+  requestActions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  msgBtnSmall: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  approveBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.dark.tint, justifyContent: 'center', alignItems: 'center' },
   denyBtn: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: '#FF4444', justifyContent: 'center', alignItems: 'center' },
   modalWrapper: { flex: 1, backgroundColor: '#050505' }, modalContent: { padding: 20 }, modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }, modalTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' }, modalClose: { color: '#666' },
   inputLabel: { color: '#666', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, marginTop: 16 }, input: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 12, color: '#fff', fontSize: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },

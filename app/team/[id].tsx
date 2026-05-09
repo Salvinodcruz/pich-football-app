@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Image} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { getTeam, requestToJoinTeam } from '@/src/utils/teamService';
+import { getTeam, requestToJoinTeam, startConversation } from '@/src/utils/teamService';
 import { auth, db } from '@/src/config/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 export default function TeamProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, preview } = useLocalSearchParams<{ id: string, preview?: string }>();
   const router = useRouter();
   const [team, setTeam] = useState<Team | null>(null);
   const [players, setPlayers] = useState<any[]>([]);
@@ -23,6 +23,7 @@ export default function TeamProfileScreen() {
 
   const isCaptain = team?.captainId === auth.currentUser?.uid;
   const isMyTeam = team?.players?.includes(auth.currentUser?.uid || '');
+  const isPreview = preview === 'true';
 
   useEffect(() => {
     if (id) {
@@ -135,7 +136,7 @@ export default function TeamProfileScreen() {
         </View>
 
         {/* Action Buttons */}
-        {!isMyTeam && (
+        {!isMyTeam && !isPreview && (
           <View style={styles.actionsContainer}>
             {!hasTeam && (
               <TouchableOpacity style={styles.joinRequestBtn} onPress={handleJoinRequest} disabled={requesting}>
@@ -149,11 +150,8 @@ export default function TeamProfileScreen() {
             )}
             <TouchableOpacity style={styles.messageCaptainBtnGlass} onPress={async () => {
               const user = auth.currentUser; if (!user) return;
-              const myTeamDoc = await getDoc(doc(db, 'users', user.uid));
-              const myTeamId = myTeamDoc.data()?.teamId;
-              if (!myTeamId) { Alert.alert('Error', 'You need a team to message other captains'); return; }
-              const chatId = [myTeamId, team.id].sort().join('_');
-              router.push({ pathname: '/direct-chat/[id]', params: { id: chatId, chatName: team.name } });
+              const chatId = startConversation(user.uid, team.captainId);
+              router.push({ pathname: '/direct-chat/[id]', params: { id: team.captainId, name: team.captainName || 'Captain' } });
             }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Ionicons name="chatbubble" size={20} color="#FFF" />
@@ -212,7 +210,7 @@ export default function TeamProfileScreen() {
           </View>
         </View>
 
-        {isCaptain && (
+        {isCaptain && !isPreview && (
           <TouchableOpacity style={styles.viewChallengesBtn} onPress={() => router.push('/challenges')}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
               <Ionicons name="flash" size={20} color={Colors.dark.tint} />
@@ -261,7 +259,7 @@ const styles = StyleSheet.create({
   messageCaptainBtnGlass: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: Spacing.md, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   messageCaptainBtnTextGlass: { color: '#FFF', fontSize: FontSizes.md, fontWeight: 'bold' },
   challengeBtn: { backgroundColor: Colors.dark.tint + '20', borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center', borderWidth: 1, borderColor: Colors.dark.tint },
-  challengeBtnText: { color: Colors.dark.tint, fontSize: FontSizes.md, fontWeight: 'bold' },
+  challengeBtnText: { color: Colors.dark.tint, fontSize: FontSizes.md, fontWeight: FontWeights.bold },
   reportBtn: { alignSelf: 'center', marginTop: Spacing.xl },
   reportBtnText: { color: 'rgba(255,255,255,0.2)', fontSize: FontSizes.xs, fontWeight: 'semibold', textDecorationLine: 'underline' },
 
@@ -291,4 +289,3 @@ const styles = StyleSheet.create({
   teamCodeBadge: { marginTop: 4, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 4, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   teamCodeBadgeText: { color: Colors.dark.tint, fontSize: 10, fontWeight: 'bold', letterSpacing: 1 },
 });
-

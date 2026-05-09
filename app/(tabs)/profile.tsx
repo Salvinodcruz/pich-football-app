@@ -486,8 +486,9 @@ const styles = StyleSheet.create({
   badgeText: { color: '#fff', fontSize: 8, fontWeight: FontWeights.bold },
 
   // Dropdown
-  dropdown: { position: 'absolute', top: 56, right: Spacing.lg, backgroundColor: '#1A1A1A', borderRadius: BorderRadius.md, borderWidth: 1, borderColor: '#2A2A2A', zIndex: 100, minWidth: 200, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 10 },
-  dropdownOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 },
+  dropdown: { position: 'absolute', top: 64, right: Spacing.lg, backgroundColor: '#1A1A1A', borderRadius: BorderRadius.md, borderWidth: 1, borderColor: '#2A2A2A', zIndex: 9999, minWidth: 200, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 10 },
+  dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 9998, backgroundColor: 'transparent' },
+
   dropdownItem: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, gap: Spacing.sm },
   dropdownItemRow: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, gap: Spacing.sm },
   dropdownIcon: { marginRight: 8 },

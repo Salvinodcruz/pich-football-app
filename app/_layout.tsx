@@ -50,6 +50,7 @@ export default function RootLayout() {
           <Stack.Screen name="tournament/[id]" options={{ headerShown: false, gestureEnabled: true }} />
           <Stack.Screen name="tournament-details" options={{ headerShown: false, gestureEnabled: true }} />
           <Stack.Screen name="match-details" options={{ headerShown: false, gestureEnabled: true }} />
+          <Stack.Screen name="player-profile" options={{ headerShown: false, gestureEnabled: true }} />
           <Stack.Screen name="submit-result" options={{ headerShown: false, gestureEnabled: true }} />
           <Stack.Screen name="free-agents" options={{ headerShown: false, gestureEnabled: true }} />
           <Stack.Screen name="report-team" options={{ headerShown: false, gestureEnabled: true }} />

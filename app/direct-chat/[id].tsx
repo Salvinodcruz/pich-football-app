@@ -19,9 +19,9 @@ export default function DirectChatScreen() {
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
-  const [myTeamId, setMyTeamId] = useState('');
+  const [myId, setMyId] = useState('');
   const [myName, setMyName] = useState('');
-  const [myLogo, setMyLogo] = useState<string | null>(null);
+  const [myPhoto, setMyPhoto] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -43,27 +43,22 @@ export default function DirectChatScreen() {
   const loadMe = async () => {
     const user = auth.currentUser;
     if (!user) return;
+    setMyId(user.uid);
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     const userData = userDoc.data();
-    const teamId = userData?.teamId;
-    setMyTeamId(teamId);
-    if (teamId) {
-      const teamDoc = await getDoc(doc(db, 'teams', teamId));
-      const teamData = teamDoc.data();
-      setMyName(teamData?.name || 'Team');
-      setMyLogo(teamData?.logoURL || null);
-    }
+    setMyName(userData?.firstName || userData?.name || 'Player');
+    setMyPhoto(userData?.photoURL || null);
   };
 
   const sendMessage = async () => {
-    if (!text.trim() || sending || !myTeamId) return;
+    if (!text.trim() || sending || !myId) return;
     setSending(true);
     try {
       await addDoc(collection(db, 'directChats', id, 'messages'), {
         text: text.trim(),
-        senderId: myTeamId,
+        senderId: myId,
         senderName: myName,
-        senderLogo: myLogo,
+        senderPhoto: myPhoto,
         createdAt: new Date().toISOString(),
         read: false,
       });
@@ -84,10 +79,10 @@ export default function DirectChatScreen() {
             <Ionicons name="chevron-back" size={24} color={Colors.dark.tint} />
           </TouchableOpacity>
           <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle}>{chatName || 'Team'}</Text>
+            <Text style={styles.headerTitle}>{chatName || 'Chat'}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name="shield-outline" size={10} color="#666" />
-              <Text style={styles.headerSub}>Team Captain · Direct Message</Text>
+              <Ionicons name="chatbubble-outline" size={10} color="#666" />
+              <Text style={styles.headerSub}>Direct Message</Text>
             </View>
           </View>
         </View>
@@ -108,16 +103,16 @@ export default function DirectChatScreen() {
               <View style={styles.empty}>
                 <Ionicons name="chatbubble-ellipses-outline" size={64} color="rgba(255,255,255,0.1)" />
                 <Text style={styles.emptyTitle}>No messages yet</Text>
-                <Text style={styles.emptySub}>Coordinate with the other team captain</Text>
+                <Text style={styles.emptySub}>Start coordinating your match or team recruitment</Text>
               </View>
             ) : (
               messages.map(msg => {
-                const isMe = msg.senderId === myTeamId;
+                const isMe = msg.senderId === myId;
                 return (
                   <View key={msg.id} style={[styles.msgRow, isMe && styles.msgRowMe]}>
                     {!isMe && (
-                      msg.senderLogo ? (
-                        <Image source={{ uri: msg.senderLogo }} style={styles.msgAvatar} />
+                      msg.senderPhoto ? (
+                        <Image source={{ uri: msg.senderPhoto }} style={styles.msgAvatar} />
                       ) : (
                         <View style={styles.msgAvatarPlaceholder}>
                           <Text style={styles.msgAvatarText}>{msg.senderName?.substring(0, 2).toUpperCase() || '?'}</Text>

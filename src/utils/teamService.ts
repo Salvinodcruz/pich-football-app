@@ -7,6 +7,9 @@ import {
   updateDoc,
   query,
   where,
+  writeBatch,
+  arrayUnion,
+  deleteDoc,
 } from 'firebase/firestore';
 import { db } from '@/src/config/firebase';
 import type { Team } from '@/src/types';
@@ -31,7 +34,7 @@ export const createTeam = async (
   };
 
 
-  
+
   const docRef = await addDoc(collection(db, 'teams'), newTeam);
 
   // Update user's teamId
@@ -50,6 +53,58 @@ export const getTeam = async (teamId: string): Promise<Team | null> => {
     return { id: teamDoc.id, ...teamDoc.data() } as Team;
   }
   return null;
+};
+
+// Respond to join request (Refined with writeBatch)
+export const respondToJoinRequest = async (requestId: string, approve: boolean): Promise<void> => {
+  const reqDoc = await getDoc(doc(db, 'teamJoinRequests', requestId));
+  if (!reqDoc.exists()) return;
+  const data = reqDoc.data();
+
+  const batch = writeBatch(db);
+
+  if (approve) {
+    const teamRef = doc(db, 'teams', data.teamId);
+    const userRef = doc(db, 'users', data.userId);
+
+    batch.update(teamRef, { players: arrayUnion(data.userId) });
+    batch.update(userRef, { teamId: data.teamId, isFreeAgent: false });
+    batch.delete(doc(db, 'teamJoinRequests', requestId));
+
+    // Notify player
+    const notifRef = doc(collection(db, 'notifications'));
+    batch.set(notifRef, {
+      type: 'join_approved',
+      toUserId: data.userId,
+      teamId: data.teamId,
+      createdAt: new Date().toISOString(),
+      read: false,
+    });
+  } else {
+    batch.delete(doc(db, 'teamJoinRequests', requestId));
+  }
+
+  await batch.commit();
+};
+
+// Invite player to team
+export const invitePlayerToTeam = async (teamId: string, teamName: string, captainId: string, playerId: string): Promise<void> => {
+  await addDoc(collection(db, 'notifications'), {
+    type: 'team_invite',
+    toUserId: playerId,
+    fromTeamId: teamId,
+    fromTeamName: teamName,
+    fromUserId: captainId,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+    read: false,
+  });
+};
+
+// Start a conversation
+export const startConversation = (userA: string, userB: string) => {
+  const chatId = [userA, userB].sort().join('_');
+  return chatId;
 };
 
 // Get all teams by emirate
@@ -112,6 +167,7 @@ export const requestToJoinTeam = async (teamId: string, userId: string, userName
       type: 'join_request',
       toUserId: captainId,
       fromUserName: userName,
+      fromUserId: userId,
       teamId,
       teamName: teamDoc.data()?.name,
       createdAt: new Date().toISOString(),
@@ -129,27 +185,4 @@ export const getPendingJoinRequests = async (teamId: string): Promise<any[]> => 
   );
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-};
-
-// Respond to join request
-export const respondToJoinRequest = async (requestId: string, approve: boolean): Promise<void> => {
-  const reqDoc = await getDoc(doc(db, 'teamJoinRequests', requestId));
-  if (!reqDoc.exists()) return;
-  const data = reqDoc.data();
-
-  if (approve) {
-    await addPlayerToTeam(data.teamId, data.userId);
-    await updateDoc(doc(db, 'teamJoinRequests', requestId), { status: 'approved' });
-    
-    // Notify player
-    await addDoc(collection(db, 'notifications'), {
-      type: 'join_approved',
-      toUserId: data.userId,
-      teamId: data.teamId,
-      createdAt: new Date().toISOString(),
-      read: false,
-    });
-  } else {
-    await updateDoc(doc(db, 'teamJoinRequests', requestId), { status: 'denied' });
-  }
 };

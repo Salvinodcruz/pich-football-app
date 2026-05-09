@@ -30,39 +30,51 @@ export default function FreeAgentsScreen() {
   const [isCaptain, setIsCaptain] = useState(false);
   const [recruiting, setRecruiting] = useState<string | null>(null);
 
-  useEffect(() => { load(); }, []);
-
-  const load = async () => {
-    try {
-      const user = auth.currentUser;
-      if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        const tid = userDoc.data()?.teamId;
-        setUserTeamId(tid || null);
-        if (tid) {
-          const teamDoc = await getDoc(doc(db, 'teams', tid));
-          const teamData = teamDoc.data();
-          setIsCaptain(teamData?.captainId === user.uid);
-          setUserTeamName(teamData?.name || '');
+  useEffect(() => {
+    let unsubscribe: () => void;
+    
+    const init = async () => {
+      try {
+        const user = auth.currentUser;
+        if (user) {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          const tid = userDoc.data()?.teamId;
+          setUserTeamId(tid || null);
+          if (tid) {
+            const teamDoc = await getDoc(doc(db, 'teams', tid));
+            const teamData = teamDoc.data();
+            setIsCaptain(teamData?.captainId === user.uid);
+            setUserTeamName(teamData?.name || '');
+          }
         }
-      }
 
-      const q = query(collection(db, 'users'), where('isFreeAgent', '==', true));
-      const snap = await getDocs(q);
-      const all = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter((p: any) => p.id !== auth.currentUser?.uid);
+        const q = query(collection(db, 'users'), where('isFreeAgent', '==', true));
+        unsubscribe = onSnapshot(q, (snap) => {
+          const all = snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter((p: any) => p.id !== auth.currentUser?.uid);
+          
+          const seen = new Set();
+          const unique = all.filter((p: any) => {
+            const key = p.playerId || p.id;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          setPlayers(unique);
+          setLoading(false);
+          setRefreshing(false);
+        });
+      } catch (e) { console.error(e); setLoading(false); setRefreshing(false); }
+    };
 
-      const seen = new Set();
-      const unique = all.filter((p: any) => {
-        const key = p.playerId || p.id;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-      setPlayers(unique);
-    } catch (e) { console.error(e); } 
-    finally { setLoading(false); setRefreshing(false); }
+    init();
+    return () => unsubscribe?.();
+  }, []);
+
+  const load = () => {
+    setRefreshing(true);
+    // onSnapshot handles data
   };
 
   const handleRecruit = async (player: any) => {
@@ -201,7 +213,11 @@ export default function FreeAgentsScreen() {
                 : (player.name || 'P').substring(0, 2);
 
               return (
-                <View key={player.id} style={styles.card}>
+                <TouchableOpacity 
+                  key={player.id} 
+                  style={styles.card}
+                  onPress={() => router.push({ pathname: '/player-profile', params: { id: player.id } })}
+                >
                   <View style={styles.cardHeader}>
                     <View style={styles.avatar}>
                       <Text style={styles.avatarText}>{initials.toUpperCase()}</Text>
@@ -239,23 +255,7 @@ export default function FreeAgentsScreen() {
                       </View>
                     ))}
                   </View>
-
-                  {isCaptain && (
-                    <TouchableOpacity
-                      style={[styles.recruitBtn, recruiting === player.id && { opacity: 0.6 }]}
-                      onPress={() => handleRecruit(player)}
-                      disabled={recruiting === player.id}
-                    >
-                      {recruiting === player.id
-                        ? <ActivityIndicator color="#000" size="small" />
-                        : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Ionicons name="person-add-outline" size={16} color="#000" />
-                            <Text style={styles.recruitBtnText}>Send Recruit Request</Text>
-                          </View>
-                      }
-                    </TouchableOpacity>
-                  )}
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
