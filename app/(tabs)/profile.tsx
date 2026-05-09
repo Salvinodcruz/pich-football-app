@@ -1,0 +1,553 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView,
+  TouchableOpacity, Switch, Alert, ActivityIndicator,
+  TextInput, Image, Modal, Animated,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { signOut } from 'firebase/auth';
+import { auth, db } from '@/src/config/firebase';
+import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
+import { updatePlayerRating } from '@/src/utils/ratingService';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
+import * as ImagePicker from 'expo-image-picker';
+import ChevronBackground from '@/src/components/ChevronBackground';
+
+const POSITIONS = ['GK', 'DEF', 'MID', 'FWD'];
+const EMIRATES = ['Sharjah', 'Dubai', 'Ajman'];
+
+export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [profile, setProfile] = useState<any>(null);
+  const [isFreeAgent, setIsFreeAgent] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showPlayerInfo, setShowPlayerInfo] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editMiddleName, setEditMiddleName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editPosition, setEditPosition] = useState('');
+  const [editEmirate, setEditEmirate] = useState('');
+  const [editDobDay, setEditDobDay] = useState('');
+  const [editDobMonth, setEditDobMonth] = useState('');
+  const [editDobYear, setEditDobYear] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  useEffect(() => {
+    loadProfile();
+    const user = auth.currentUser;
+    if (user) {
+      updatePlayerRating(user.uid).then(() => loadProfile());
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => { loadUnreadCount(); }, []));
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: showDropdown ? 1 : 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+  }, [showDropdown]);
+
+  const loadProfile = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const docSnap = await getDoc(doc(db, 'users', user.uid));
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setProfile(data);
+        setIsFreeAgent(data.isFreeAgent || false);
+        setEditFirstName(data.firstName || '');
+        setEditMiddleName(data.middleName || '');
+        setEditLastName(data.lastName || '');
+        setEditPosition(data.position || '');
+        setEditEmirate(data.emirate || '');
+        const dobParts = data.dob?.split(' ') || [];
+        setEditDobDay(dobParts[0] || '');
+        setEditDobMonth(dobParts[1] || '');
+        setEditDobYear(dobParts[2] || '');
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadUnreadCount = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const q = query(collection(db, 'notifications'), where('toUserId', '==', user.uid), where('read', '==', false));
+      const snap = await getDocs(q);
+      setUnreadCount(snap.size);
+    } catch (e) { console.error(e); }
+  };
+
+  const handlePhotoUpload = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow access to your photo library'); return; }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true, aspect: [1, 1], quality: 0.3, base64: true,
+      });
+      if (result.canceled || !result.assets[0].base64) return;
+      setUploadingPhoto(true);
+      const user = auth.currentUser;
+      if (!user) return;
+      await updateDoc(doc(db, 'users', user.uid), { photoURL: `data:image/jpeg;base64,${result.assets[0].base64}` });
+      await loadProfile();
+      Alert.alert('✅ Photo Updated!');
+    } catch (e) {
+      Alert.alert('Error', 'Could not upload photo');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editFirstName.trim() || !editLastName.trim()) { Alert.alert('Error', 'First and last name required'); return; }
+    setSaving(true);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      const fullName = [editFirstName, editMiddleName, editLastName].filter(Boolean).join(' ');
+      await updateDoc(doc(db, 'users', user.uid), {
+        firstName: editFirstName.trim(),
+        middleName: editMiddleName.trim(),
+        lastName: editLastName.trim(),
+        name: `${editFirstName.trim()} ${editLastName.trim()}`,
+        fullName,
+        position: editPosition,
+        emirate: editEmirate,
+        dob: editDobDay && editDobMonth && editDobYear ? `${editDobDay} ${editDobMonth} ${editDobYear}` : profile?.dob || null,
+      });
+      await loadProfile();
+      setShowEditModal(false);
+      Alert.alert('Saved! ✅');
+    } catch (e) {
+      Alert.alert('Error', 'Could not save changes');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleFreeAgent = async (value: boolean) => {
+    setIsFreeAgent(value);
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      await updateDoc(doc(db, 'users', user.uid), { isFreeAgent: value });
+    } catch (e) { Alert.alert('Error', 'Could not update free agent status'); }
+  };
+
+  const handleSignOut = async () => {
+    setShowDropdown(false);
+    Alert.alert('Sign Out', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign Out', style: 'destructive', onPress: async () => { await signOut(auth); router.replace('/login'); } }
+    ]);
+  };
+
+  if (loading) return (
+    <View style={styles.center}>
+      <ActivityIndicator size="large" color={Colors.dark.tint} />
+    </View>
+  );
+
+  const displayName = profile?.firstName && profile?.lastName
+    ? `${profile.firstName} ${profile.lastName}`
+    : profile?.name || 'Player';
+
+  const initials = profile?.firstName && profile?.lastName
+    ? `${profile.firstName[0]}${profile.lastName[0]}`
+    : (profile?.name || 'P').substring(0, 2);
+
+  const positionColors: Record<string, string> = {
+    GK: '#FFC107', DEF: '#4FC3F7', MID: Colors.dark.tint, FWD: '#FF6B6B',
+  };
+  const posColor = positionColors[profile?.position] || Colors.dark.tint;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#0A0A0A' }}>
+      <ChevronBackground />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, {
+          paddingTop: insets.top + Spacing.md,
+          paddingBottom: insets.bottom + 80,
+        }]}
+      >
+        {/* ── Header Row ── */}
+        <View style={styles.headerRow}>
+          <Text style={styles.pageTitle}>Profile</Text>
+          <View style={styles.headerIcons}>
+            {/* Friends icon */}
+            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/friends')}>
+              <Text style={styles.iconBtnText}>👥</Text>
+            </TouchableOpacity>
+
+            {/* Notifications bell */}
+            <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/notifications')}>
+              <Text style={styles.iconBtnText}>🔔</Text>
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Menu */}
+            <TouchableOpacity style={styles.iconBtn} onPress={() => setShowDropdown(!showDropdown)}>
+              <Text style={styles.iconBtnText}>⋮</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Dropdown */}
+        {showDropdown && (
+          <Animated.View style={[styles.dropdown, { opacity: fadeAnim }]}>
+            <TouchableOpacity style={styles.dropdownItem} onPress={() => { setShowDropdown(false); setShowEditModal(true); }}>
+              <Text style={styles.dropdownIcon}>✏️</Text>
+              <Text style={styles.dropdownText}>Edit Profile</Text>
+            </TouchableOpacity>
+            <View style={styles.dropdownDivider} />
+            <TouchableOpacity style={styles.dropdownItem} onPress={() => { setShowDropdown(false); setShowPlayerInfo(true); }}>
+              <Text style={styles.dropdownIcon}>🪪</Text>
+              <Text style={styles.dropdownText}>Player Info</Text>
+            </TouchableOpacity>
+            <View style={styles.dropdownDivider} />
+            <View style={styles.dropdownItemRow}>
+              <Text style={styles.dropdownIcon}>👟</Text>
+              <Text style={styles.dropdownText}>Free Agent</Text>
+              <Switch
+                value={isFreeAgent}
+                onValueChange={toggleFreeAgent}
+                trackColor={{ false: Colors.dark.border, true: Colors.dark.tint }}
+                thumbColor={isFreeAgent ? '#000' : '#888'}
+                style={{ marginLeft: 'auto' }}
+              />
+            </View>
+            <View style={styles.dropdownDivider} />
+            <TouchableOpacity style={styles.dropdownItem} onPress={handleSignOut}>
+              <Text style={styles.dropdownIcon}>🚪</Text>
+              <Text style={[styles.dropdownText, { color: '#FF4444' }]}>Sign Out</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+        {showDropdown && <TouchableOpacity style={styles.dropdownOverlay} onPress={() => setShowDropdown(false)} activeOpacity={1} />}
+
+        {/* ── Hero Section ── */}
+        <View style={styles.heroSection}>
+          {/* Avatar with glow */}
+          <TouchableOpacity style={styles.avatarWrapper} onPress={handlePhotoUpload} disabled={uploadingPhoto}>
+            <View style={styles.avatarGlow}>
+              {profile?.photoURL ? (
+                <Image source={{ uri: profile.photoURL }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Text style={styles.avatarInitials}>{initials.toUpperCase()}</Text>
+                </View>
+              )}
+              {/* Position badge on avatar */}
+              {profile?.position && (
+                <View style={[styles.posBadgeOnAvatar, { backgroundColor: posColor }]}>
+                  <Text style={styles.posBadgeText}>{profile.position}</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.cameraBtn}>
+              {uploadingPhoto
+                ? <ActivityIndicator size="small" color={Colors.dark.tint} />
+                : <Text style={{ fontSize: 12 }}>📷</Text>
+              }
+            </View>
+          </TouchableOpacity>
+
+          {/* Name + ID */}
+          <Text style={styles.heroName}>{displayName}</Text>
+          <View style={styles.heroSubRow}>
+            {profile?.playerId && (
+              <View style={styles.playerIdChip}>
+                <Text style={styles.playerIdChipText}>{profile.playerId}</Text>
+              </View>
+            )}
+            {profile?.emirate && (
+              <Text style={styles.heroMeta}>📍 {profile.emirate}</Text>
+            )}
+          </View>
+          {profile?.dob && <Text style={styles.heroDob}>🎂 {profile.dob}</Text>}
+        </View>
+
+        {/* ── Rating Hero ── */}
+        <View style={styles.ratingHero}>
+          <View style={styles.ratingRing}>
+            <Text style={styles.ratingValue}>{profile?.skillRating ?? 0}</Text>
+            <Text style={styles.ratingLabel}>RATING</Text>
+          </View>
+        </View>
+
+        {/* ── Stats Row ── */}
+        <View style={styles.statsRow}>
+          {[
+            { label: 'Matches', value: profile?.matches || 0, icon: '🏟' },
+            { label: 'Goals', value: profile?.goals || 0, icon: '⚽' },
+            { label: 'Assists', value: profile?.assists || 0, icon: '🎯' },
+          ].map(stat => (
+            <View key={stat.label} style={styles.statGlass}>
+              <Text style={styles.statIcon}>{stat.icon}</Text>
+              <Text style={styles.statVal}>{stat.value}</Text>
+              <Text style={styles.statLbl}>{stat.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* ── Action Row ── */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity style={styles.actionHalf} onPress={() => router.push('/friends')}>
+            <Text style={styles.actionHalfIcon}>👥</Text>
+            <Text style={styles.actionHalfText}>Friends</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionHalf, styles.actionHalfGreen]} onPress={() => router.push('/free-agents')}>
+            <Text style={styles.actionHalfIcon}>👟</Text>
+            <Text style={[styles.actionHalfText, { color: Colors.dark.tint }]}>Free Agents</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Admin */}
+        {(profile?.role === 'admin' || profile?.role === 'Admin') && (
+          <TouchableOpacity
+            style={styles.adminBtn}
+            onPress={async () => {
+              const { recalculateAllRatings } = await import('@/src/utils/ratingService');
+              await recalculateAllRatings();
+              loadProfile();
+              Alert.alert('✅', 'All ratings recalculated!');
+            }}
+          >
+            <Text style={styles.adminBtnText}>⚙️ Recalculate All Ratings</Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
+
+      {/* ── Edit Modal ── */}
+      <Modal visible={showEditModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowEditModal(false)}>
+        <ScrollView style={styles.modalContainer} contentContainerStyle={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Edit Profile</Text>
+            <TouchableOpacity onPress={() => setShowEditModal(false)}>
+              <Text style={styles.modalClose}>✕ Close</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.inputLabel}>First Name *</Text>
+          <TextInput style={styles.input} value={editFirstName} onChangeText={setEditFirstName} placeholder="First Name" placeholderTextColor={Colors.dark.textSecondary} autoCapitalize="words" />
+          <Text style={styles.inputLabel}>Middle Name</Text>
+          <TextInput style={styles.input} value={editMiddleName} onChangeText={setEditMiddleName} placeholder="Middle Name" placeholderTextColor={Colors.dark.textSecondary} autoCapitalize="words" />
+          <Text style={styles.inputLabel}>Last Name *</Text>
+          <TextInput style={styles.input} value={editLastName} onChangeText={setEditLastName} placeholder="Last Name" placeholderTextColor={Colors.dark.textSecondary} autoCapitalize="words" />
+          <Text style={styles.inputLabel}>Date of Birth</Text>
+          <View style={styles.dobRow}>
+            <TextInput style={[styles.input, styles.dobDay]} value={editDobDay} onChangeText={setEditDobDay} placeholder="DD" placeholderTextColor={Colors.dark.textSecondary} keyboardType="numeric" maxLength={2} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+              {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map(m => (
+                <TouchableOpacity key={m} style={[styles.monthBtn, editDobMonth === m && styles.monthBtnActive]} onPress={() => setEditDobMonth(m)}>
+                  <Text style={[styles.monthText, editDobMonth === m && styles.monthTextActive]}>{m}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TextInput style={[styles.input, styles.dobYear]} value={editDobYear} onChangeText={setEditDobYear} placeholder="YYYY" placeholderTextColor={Colors.dark.textSecondary} keyboardType="numeric" maxLength={4} />
+          </View>
+          <Text style={styles.inputLabel}>Position</Text>
+          <View style={styles.optionRow}>
+            {POSITIONS.map(p => (
+              <TouchableOpacity key={p} style={[styles.optionBtn, editPosition === p && styles.optionBtnActive]} onPress={() => setEditPosition(p)}>
+                <Text style={[styles.optionText, editPosition === p && styles.optionTextActive]}>{p}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.inputLabel}>Emirate</Text>
+          <View style={styles.optionRow}>
+            {EMIRATES.map(e => (
+              <TouchableOpacity key={e} style={[styles.optionBtn, editEmirate === e && styles.optionBtnActive]} onPress={() => setEditEmirate(e)}>
+                <Text style={[styles.optionText, editEmirate === e && styles.optionTextActive]}>{e}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSaveEdit} disabled={saving}>
+            {saving ? <ActivityIndicator color="#000" /> : <Text style={styles.saveBtnText}>Save Changes</Text>}
+          </TouchableOpacity>
+        </ScrollView>
+      </Modal>
+
+      {/* ── Player Info Modal ── */}
+      <Modal visible={showPlayerInfo} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowPlayerInfo(false)}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Player Info</Text>
+              <TouchableOpacity onPress={() => setShowPlayerInfo(false)}>
+                <Text style={styles.modalClose}>✕ Close</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.infoCard}>
+              {[
+                { label: 'Player ID', value: profile?.playerId, color: Colors.dark.tint },
+                { label: 'Full Name', value: profile?.fullName || displayName },
+                { label: 'Position', value: profile?.position },
+                { label: 'Emirate', value: profile?.emirate },
+                { label: 'Date of Birth', value: profile?.dob },
+                { label: 'Free Agent', value: isFreeAgent ? 'Yes' : 'No', color: isFreeAgent ? Colors.dark.tint : undefined },
+              ].map((row, i, arr) => (
+                <View key={row.label}>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>{row.label}</Text>
+                    <Text style={[styles.infoValue, row.color ? { color: row.color } : {}]}>{row.value || '—'}</Text>
+                  </View>
+                  {i < arr.length - 1 && <View style={styles.infoDivider} />}
+                </View>
+              ))}
+            </View>
+            <Text style={styles.shareHint}>Share your Player ID so captains can find and add you</Text>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: 'transparent' },
+  content: { padding: Spacing.lg },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.dark.background },
+
+  // Header
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xl },
+  pageTitle: { fontSize: FontSizes.xxl, fontWeight: FontWeights.bold, color: '#fff' },
+  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  iconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#141414CC', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#2A2A2A', position: 'relative' },
+  iconBtnText: { fontSize: 16 },
+  badge: { position: 'absolute', top: -3, right: -3, backgroundColor: '#FF4444', borderRadius: 8, minWidth: 15, height: 15, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: '#0A0A0A' },
+  badgeText: { color: '#fff', fontSize: 8, fontWeight: FontWeights.bold },
+
+  // Dropdown
+  dropdown: { position: 'absolute', top: 56, right: Spacing.lg, backgroundColor: '#1A1A1A', borderRadius: BorderRadius.md, borderWidth: 1, borderColor: '#2A2A2A', zIndex: 100, minWidth: 200, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 10 },
+  dropdownOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 },
+  dropdownItem: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, gap: Spacing.sm },
+  dropdownItemRow: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, gap: Spacing.sm },
+  dropdownIcon: { fontSize: 16, width: 24 },
+  dropdownText: { color: '#fff', fontSize: FontSizes.sm },
+  dropdownDivider: { height: 1, backgroundColor: '#2A2A2A' },
+
+  // Hero
+  heroSection: { alignItems: 'center', marginBottom: Spacing.lg },
+  avatarWrapper: { position: 'relative', marginBottom: Spacing.md },
+  avatarGlow: {
+    width: 96, height: 96, borderRadius: 48,
+    borderWidth: 2.5, borderColor: Colors.dark.tint,
+    shadowColor: Colors.dark.tint,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 48 },
+  avatarPlaceholder: { width: '100%', height: '100%', backgroundColor: '#1A1A1A', justifyContent: 'center', alignItems: 'center' },
+  avatarInitials: { color: Colors.dark.tint, fontSize: FontSizes.xl, fontWeight: FontWeights.bold },
+  posBadgeOnAvatar: { position: 'absolute', bottom: 0, right: -2, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1.5, borderColor: '#0A0A0A' },
+  posBadgeText: { color: '#000', fontSize: 9, fontWeight: FontWeights.bold },
+  cameraBtn: { position: 'absolute', bottom: -2, right: -2, backgroundColor: '#1A1A1A', borderRadius: 12, width: 24, height: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#2A2A2A' },
+  heroName: { fontSize: 22, fontWeight: FontWeights.bold, color: '#fff', marginBottom: 6 },
+  heroSubRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: 4 },
+  playerIdChip: { backgroundColor: Colors.dark.tint + '15', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: Colors.dark.tint + '40' },
+  playerIdChipText: { color: Colors.dark.tint, fontSize: 11, fontWeight: FontWeights.bold, letterSpacing: 1 },
+  heroMeta: { color: '#666', fontSize: FontSizes.xs },
+  heroDob: { color: '#555', fontSize: FontSizes.xs, marginTop: 2 },
+
+  // Rating Ring
+  ratingHero: { alignItems: 'center', marginBottom: Spacing.lg },
+  ratingRing: {
+    width: 80, height: 80, borderRadius: 40,
+    borderWidth: 3, borderColor: Colors.dark.tint,
+    backgroundColor: Colors.dark.tint + '10',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: Colors.dark.tint,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  ratingValue: { color: Colors.dark.tint, fontSize: 24, fontWeight: FontWeights.bold },
+  ratingLabel: { color: Colors.dark.tint, fontSize: 8, fontWeight: FontWeights.bold, letterSpacing: 1 },
+
+  // Stats
+  statsRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.lg },
+  statGlass: {
+    flex: 1,
+    backgroundColor: '#141414CC',
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    gap: 4,
+  },
+  statIcon: { fontSize: 16 },
+  statVal: { color: '#fff', fontSize: FontSizes.lg, fontWeight: FontWeights.bold },
+  statLbl: { color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  // Action Row
+  actionRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
+  actionHalf: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, backgroundColor: '#141414CC', borderRadius: BorderRadius.md, padding: Spacing.md, borderWidth: 1, borderColor: '#2A2A2A' },
+  actionHalfGreen: { borderColor: Colors.dark.tint + '40', backgroundColor: Colors.dark.tint + '08' },
+  actionHalfIcon: { fontSize: 16 },
+  actionHalfText: { color: '#aaa', fontSize: FontSizes.sm, fontWeight: FontWeights.semibold },
+
+  // Admin
+  adminBtn: { backgroundColor: '#FFC10715', borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center', marginBottom: Spacing.md, borderWidth: 1, borderColor: '#FFC10740' },
+  adminBtnText: { color: '#FFC107', fontSize: FontSizes.sm, fontWeight: FontWeights.semibold },
+
+  // Modal
+  modalContainer: { flex: 1, backgroundColor: Colors.dark.background },
+  modalContent: { padding: Spacing.lg, paddingBottom: 60 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xl, marginTop: Spacing.md },
+  modalTitle: { fontSize: FontSizes.xl, fontWeight: FontWeights.bold, color: '#fff' },
+  modalClose: { color: '#666', fontSize: FontSizes.sm },
+  inputLabel: { color: '#666', fontSize: FontSizes.xs, fontWeight: FontWeights.semibold, marginTop: Spacing.md, marginBottom: Spacing.xs, textTransform: 'uppercase', letterSpacing: 0.5 },
+  input: { backgroundColor: '#1A1A1A', borderRadius: BorderRadius.md, padding: Spacing.md, color: '#fff', fontSize: FontSizes.md, borderWidth: 1, borderColor: '#2A2A2A' },
+  dobRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.xs },
+  dobDay: { width: 60, textAlign: 'center' },
+  dobYear: { width: 80, textAlign: 'center' },
+  monthBtn: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.sm, borderRadius: BorderRadius.sm, borderWidth: 1, borderColor: '#2A2A2A', backgroundColor: '#1A1A1A', marginRight: Spacing.xs },
+  monthBtnActive: { borderColor: Colors.dark.tint, backgroundColor: Colors.dark.tint + '20' },
+  monthText: { color: '#666', fontSize: FontSizes.xs },
+  monthTextActive: { color: Colors.dark.tint, fontWeight: FontWeights.bold },
+  optionRow: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap', marginBottom: Spacing.xs },
+  optionBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: '#2A2A2A', backgroundColor: '#1A1A1A' },
+  optionBtnActive: { borderColor: Colors.dark.tint, backgroundColor: Colors.dark.tint + '20' },
+  optionText: { color: '#666', fontSize: FontSizes.sm },
+  optionTextActive: { color: Colors.dark.tint, fontWeight: FontWeights.bold },
+  saveBtn: { backgroundColor: Colors.dark.tint, borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center', marginTop: Spacing.xl },
+  saveBtnText: { color: '#000', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
+
+  // Player Info
+  infoCard: { backgroundColor: '#1A1A1A', borderRadius: BorderRadius.md, padding: Spacing.md, borderWidth: 1, borderColor: '#2A2A2A' },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.sm },
+  infoLabel: { color: '#666', fontSize: FontSizes.sm },
+  infoValue: { color: '#fff', fontSize: FontSizes.sm, fontWeight: FontWeights.semibold },
+  infoDivider: { height: 1, backgroundColor: '#2A2A2A' },
+  shareHint: { color: '#444', fontSize: FontSizes.xs, textAlign: 'center', marginTop: Spacing.lg, lineHeight: 18 },
+});
