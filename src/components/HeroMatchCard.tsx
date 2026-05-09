@@ -55,6 +55,8 @@ export default function HeroMatchCard({ match, onPress }: HeroMatchCardProps) {
     } catch { return '--:--:--'; }
   };
 
+  const isCancelled = match.status === 'cancelled';
+
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={styles.container}>
       {/* Glossy Background Effect */}
@@ -76,11 +78,13 @@ export default function HeroMatchCard({ match, onPress }: HeroMatchCardProps) {
       {/* Content */}
       <View style={styles.content}>
         <View style={styles.header}>
-          <View style={styles.liveBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>NEXT MATCH</Text>
+          <View style={[styles.liveBadge, isCancelled && styles.cancelledBadge]}>
+            <View style={[styles.liveDot, isCancelled && styles.cancelledDot]} />
+            <Text style={[styles.liveText, isCancelled && styles.cancelledText]}>
+              {isCancelled ? 'CANCELLED' : 'NEXT MATCH'}
+            </Text>
           </View>
-          <Text style={styles.countdown}>{timeLeft}</Text>
+          {!isCancelled && <Text style={styles.countdown}>{timeLeft}</Text>}
         </View>
 
         <View style={styles.matchRow}>
@@ -167,6 +171,16 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  cancelledBadge: {
+    backgroundColor: 'rgba(255,68,68,0.15)',
+    borderColor: 'rgba(255,68,68,0.3)',
+  },
+  cancelledDot: {
+    backgroundColor: '#FF4444',
+  },
+  cancelledText: {
+    color: '#FF4444',
   },
   countdown: {
     color: '#FFF',

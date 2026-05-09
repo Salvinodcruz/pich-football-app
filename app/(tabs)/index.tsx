@@ -78,14 +78,24 @@ function MatchCard({ match, onPress }: { match: any; onPress: () => void }) {
             <Ionicons name="location-outline" size={12} color="#555" />
             <Text style={styles.matchVenue} numberOfLines={1}>{match.venue}</Text>
           </View>
-          <View style={[styles.matchConfirmedBadge, match.status === 'disputed' && { borderColor: '#FF444450', backgroundColor: '#FF444412' }]}>
-            <Text style={[styles.matchConfirmedText, match.status === 'disputed' && { color: '#FF4444' }]}>
+          <View style={[
+            styles.matchConfirmedBadge, 
+            match.status === 'disputed' && { borderColor: '#FF444450', backgroundColor: '#FF444412' },
+            match.status === 'cancelled' && { borderColor: '#FF444450', backgroundColor: '#FF444412' }
+          ]}>
+            <Text style={[
+              styles.matchConfirmedText, 
+              match.status === 'disputed' && { color: '#FF4444' },
+              match.status === 'cancelled' && { color: '#FF4444' }
+            ]}>
               {match.status === 'disputed' ? (
                 <Ionicons name="warning" size={10} color="#FF4444" />
+              ) : match.status === 'cancelled' ? (
+                <Ionicons name="close-circle" size={10} color="#FF4444" />
               ) : (
                 <Ionicons name="checkmark-circle" size={10} color={Colors.dark.tint} />
               )}
-              {match.status === 'disputed' ? ' DISPUTED' : ' CONFIRMED'}
+              {match.status === 'disputed' ? ' DISPUTED' : match.status === 'cancelled' ? ' CANCELLED' : ' CONFIRMED'}
             </Text>
           </View>
         </View>
@@ -191,9 +201,6 @@ export default function HomeScreen() {
   const [incomingChallenges, setIncomingChallenges] = useState<any[]>([]);
   const [acceptedMatches, setAcceptedMatches] = useState<any[]>([]);
   const [tournaments, setTournaments] = useState<any[]>([]);
-  const [selectedChallenge, setSelectedChallenge] = useState<any>(null);
-  const [selectedTournament, setSelectedTournament] = useState<any>(null);
-  const [mapVenue, setMapVenue] = useState<string | null>(null);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [cancelDialog, setCancelDialog] = useState(false);
   const [pendingCancel, setPendingCancel] = useState<any>(null);
@@ -260,16 +267,20 @@ export default function HomeScreen() {
           await sendScoreReminders(tid);
         } catch (e) { console.error('Reminder trigger error:', e); }
       }
-      const tSnap = await getDocs(query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(5)));
-      setTournaments(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      
+      const tUnsub = onSnapshot(query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'), limit(5)), snap => {
+        setTournaments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+      unsubscribers.current.push(tUnsub);
+
     } catch (e) { console.error(e); } finally { setLoading(false); setRefreshing(false); }
   };
 
-  const handleAccept = async (challengeId: string) => { try { await updateDoc(doc(db, 'challenges', challengeId), { status: 'accepted' }); setSelectedChallenge(null); } catch (e) { console.error(e); } };
-  const handleDecline = async (challengeId: string) => { try { await updateDoc(doc(db, 'challenges', challengeId), { status: 'declined' }); setSelectedChallenge(null); } catch (e) { console.error(e); } };
-  const handleCancelMatch = (challenge: any) => { const c = { ...challenge }; setSelectedChallenge(null); setTimeout(() => { setPendingCancel(c); setCancelDialog(true); }, 500); };
+  const handleAccept = async (challengeId: string) => { try { await updateDoc(doc(db, 'challenges', challengeId), { status: 'accepted' }); } catch (e) { console.error(e); } };
+  const handleDecline = async (challengeId: string) => { try { await updateDoc(doc(db, 'challenges', challengeId), { status: 'declined' }); } catch (e) { console.error(e); } };
+
   const confirmCancel = async () => {
-    const challenge = pendingCancel; const tid = teamIdRef.current; setCancelDialog(false); setPendingCancel(null); setSelectedChallenge(null);
+    const challenge = pendingCancel; const tid = teamIdRef.current; setCancelDialog(false); setPendingCancel(null);
     if (!challenge || !tid) return;
     try {
       const { requestCancelMatch } = await import('@/src/utils/matchService');
@@ -279,7 +290,6 @@ export default function HomeScreen() {
     } catch (e) { console.error('Cancel error:', e); }
   };
 
-  const openMap = (venue: string) => { setSelectedChallenge(null); setSelectedTournament(null); setTimeout(() => setMapVenue(venue), 400); };
   const greeting = () => { const h = new Date().getHours(); if (h < 12) return 'Good morning'; if (h < 17) return 'Good afternoon'; return 'Good evening'; };
 
   if (loading) return (
@@ -319,13 +329,13 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {nextMatch && <View style={styles.section}><HeroMatchCard match={nextMatch} onPress={() => setSelectedChallenge({ ...nextMatch })} /></View>}
+        {nextMatch && <View style={styles.section}><HeroMatchCard match={nextMatch} onPress={() => router.push({ pathname: '/match-details', params: { matchId: nextMatch.id, teamId: teamId || '' } })} /></View>}
 
         {incomingChallenges.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>New Challenges</Text><View style={styles.countBadge}><Text style={styles.countBadgeText}>{incomingChallenges.length}</Text></View></View>
             {incomingChallenges.map(c => (
-              <TouchableOpacity key={c.id} style={styles.challengeCardGlass} onPress={() => setSelectedChallenge({ ...c })} activeOpacity={0.8}>
+              <TouchableOpacity key={c.id} style={styles.challengeCardGlass} onPress={() => router.push({ pathname: '/match-details', params: { matchId: c.id, teamId: teamId || '' } })} activeOpacity={0.8}>
                 <View style={styles.challengeHeader}><View style={[styles.teamDot, { backgroundColor: c.fromTeamColor || Colors.dark.tint }]}><Text style={styles.teamDotText}>{c.fromTeamName?.substring(0, 2).toUpperCase()}</Text></View><View style={styles.challengeInfo}><Text style={styles.challengeFrom} numberOfLines={1}>{c.fromTeamName}</Text><Text style={styles.challengeMeta}>{c.format} · {c.matchType}</Text></View><View style={[styles.typePill, c.matchType === 'Rated' && styles.ratedPill]}><Text style={[styles.typePillText, c.matchType === 'Rated' && styles.ratedPillText]}>{c.matchType}</Text></View></View>
                 <View style={{ gap: 4 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -347,7 +357,7 @@ export default function HomeScreen() {
         )}
 
         {otherUpcomingMatches.length > 0 && (
-          <View style={styles.section}><Text style={styles.sectionTitle}>Other Matches</Text>{otherUpcomingMatches.map(m => (<MatchCard key={m.id} match={m} onPress={() => setSelectedChallenge({ ...m })} />))}</View>
+          <View style={styles.section}><Text style={styles.sectionTitle}>Other Matches</Text>{otherUpcomingMatches.map(m => (<MatchCard key={m.id} match={m} onPress={() => router.push({ pathname: '/match-details', params: { matchId: m.id, teamId: teamId || '' } })} />))}</View>
         )}
 
         <CompletedMatchCards teamId={teamId} />
@@ -356,7 +366,7 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tournaments</Text>
             {tournaments.map(t => (
-              <TouchableOpacity key={t.id} style={styles.tournamentCardGlass} onPress={() => setSelectedTournament({ ...t })} activeOpacity={0.8}>
+              <TouchableOpacity key={t.id} style={styles.tournamentCardGlass} onPress={() => router.push({ pathname: '/tournament-details', params: { id: t.id } })} activeOpacity={0.8}>
                 <View style={styles.tournamentHeader}>
                   <View style={styles.tournamentIcon}><Ionicons name="trophy-outline" size={16} color="#FFC107" /></View>
                   <View style={{ flex: 1 }}><Text style={styles.tournamentName} numberOfLines={1}>{t.name}</Text><Text style={styles.tournamentMeta} numberOfLines={1}>{t.format} · {t.emirate} · {t.teams?.length || 0}/{t.maxTeams}</Text></View>
@@ -379,119 +389,7 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      <Modal visible={!!selectedChallenge} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSelectedChallenge(null)}>
-        <View style={styles.modalWrapper}>
-          {selectedChallenge && (
-            <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
-              <View style={styles.modalHeader}><Text style={styles.modalTitle}>Match Details</Text><TouchableOpacity onPress={() => setSelectedChallenge(null)}><Ionicons name="close" size={24} color="#666" /></TouchableOpacity></View>
-              <View style={styles.modalTeamsRow}><View style={styles.modalTeam}><View style={[styles.modalTeamBadge, { backgroundColor: selectedChallenge.fromTeamColor || Colors.dark.tint }]}><Text style={styles.modalTeamBadgeText}>{selectedChallenge.fromTeamName?.substring(0, 2).toUpperCase()}</Text></View><Text style={styles.modalTeamName} numberOfLines={2}>{selectedChallenge.fromTeamName}</Text></View><Text style={styles.modalVs}>VS</Text><View style={styles.modalTeam}><View style={[styles.modalTeamBadge, { backgroundColor: selectedChallenge.toTeamColor || '#FF6B6B' }]}><Text style={styles.modalTeamBadgeText}>{selectedChallenge.toTeamName?.substring(0, 2).toUpperCase()}</Text></View><Text style={styles.modalTeamName} numberOfLines={2}>{selectedChallenge.toTeamName}</Text></View></View>
-              <View style={styles.modalDetailsCard}>
-                {[
-                  { icon: 'football-outline', label: 'Format', value: selectedChallenge.format },
-                  { icon: 'trophy-outline', label: 'Type', value: selectedChallenge.matchType },
-                  { icon: 'calendar-outline', label: 'Date', value: selectedChallenge.date },
-                  { icon: 'time-outline', label: 'Time', value: selectedChallenge.time },
-                  { icon: 'location-outline', label: 'Venue', value: selectedChallenge.venue },
-                ].map((row, i, arr) => (
-                  <View key={row.label}>
-                    <View style={styles.modalDetailRow}>
-                      <Ionicons name={row.icon as any} size={16} color="#666" style={{ width: 24 }} />
-                      <Text style={styles.modalDetailLabel}>{row.label}</Text>
-                      <Text style={styles.modalDetailValue}>{row.value}</Text>
-                    </View>
-                    {i < arr.length - 1 && <View style={styles.modalDivider} />}
-                  </View>
-                ))}
-                {selectedChallenge.status === 'disputed' && (
-                  <View style={styles.disputeBox}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                      <Ionicons name="warning-outline" size={16} color="#FF4444" />
-                      <Text style={styles.disputeTitle}>Score Dispute</Text>
-                    </View>
-                    <View style={styles.disputeScores}>
-                      <View style={styles.disputeScoreSide}><Text style={styles.disputeScoreLabel}>{selectedChallenge.fromTeamName}</Text><Text style={styles.disputeScoreValue}>{selectedChallenge.homeScoreSubmitted?.home} - {selectedChallenge.homeScoreSubmitted?.away}</Text></View>
-                      <View style={styles.disputeScoreSide}><Text style={styles.disputeScoreLabel}>{selectedChallenge.toTeamName}</Text><Text style={styles.disputeScoreValue}>{selectedChallenge.awayScoreSubmitted?.home} - {selectedChallenge.awayScoreSubmitted?.away}</Text></View>
-                    </View>
-                  </View>
-                )}
-              </View>
-              <TouchableOpacity style={styles.mapBtn} onPress={() => openMap(selectedChallenge.venue)}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Ionicons name="map-outline" size={18} color="#FFF" />
-                  <Text style={styles.mapBtnText}>View on Map</Text>
-                </View>
-              </TouchableOpacity>
-              {selectedChallenge.status === 'pending' && (<View style={styles.modalActions}><TouchableOpacity style={styles.modalAcceptBtn} onPress={() => handleAccept(selectedChallenge.id)}><Text style={styles.modalAcceptBtnText}>Accept Challenge</Text></TouchableOpacity><TouchableOpacity style={styles.modalDeclineBtn} onPress={() => handleDecline(selectedChallenge.id)}><Text style={styles.modalDeclineBtnText}>Decline</Text></TouchableOpacity></View>)}
-              {selectedChallenge.status === 'accepted' && (
-                <View style={styles.confirmedBlock}>
-                  {selectedChallenge.fromTeamId === teamId && (
-                    <TouchableOpacity style={styles.editMatchBtn} onPress={() => { const id = selectedChallenge.id; const d = selectedChallenge.date; const t = selectedChallenge.time; const v = selectedChallenge.venue; setSelectedChallenge(null); setTimeout(() => router.push({ pathname: '/edit-match', params: { challengeId: id, currentDate: d, currentTime: t, currentVenue: v } }), 400); }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Ionicons name="pencil-outline" size={14} color="#FFC107" /><Text style={styles.editMatchBtnText}>Edit Details</Text></View>
-                    </TouchableOpacity>
-                  )}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'center', marginVertical: 12 }}>
-                    <Ionicons name="checkmark-circle" size={18} color={Colors.dark.tint} />
-                    <Text style={styles.confirmedBlockText}>Match Confirmed</Text>
-                  </View>
-                  <TouchableOpacity style={styles.chatBtn} onPress={() => { const id = selectedChallenge.id; const name = selectedChallenge.fromTeamName; setSelectedChallenge(null); setTimeout(() => router.push({ pathname: '/chat/[id]', params: { id, opponentName: name } }), 400); }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Ionicons name="chatbubble-outline" size={18} color="#FFF" /><Text style={styles.chatBtnText}>Message Captain</Text></View>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.submitResultBtn} onPress={() => { const id = selectedChallenge.id; const home = selectedChallenge.fromTeamName; const away = selectedChallenge.toTeamName; const amIHome = selectedChallenge.fromTeamId === teamIdRef.current; setSelectedChallenge(null); setTimeout(() => router.push({ pathname: '/submit-result', params: { challengeId: id, homeTeam: home, awayTeam: away, isHome: amIHome ? 'true' : 'false' } }), 400); }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Ionicons name="clipboard-outline" size={18} color={Colors.dark.tint} /><Text style={styles.submitResultBtnText}>Submit Result</Text></View>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.cancelMatchBtn} onPress={() => handleCancelMatch(selectedChallenge)}>
-                    <Text style={styles.cancelMatchBtnText}>{selectedChallenge.cancelRequest ? 'Cancel Requested...' : 'Cancel Match'}</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </ScrollView>
-          )}
-        </View>
-      </Modal>
-
-      <Modal visible={!!selectedTournament} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSelectedTournament(null)}>
-        <View style={styles.modalWrapper}>
-          {selectedTournament && (
-            <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
-              <View style={styles.modalHeader}><Text style={styles.modalTitle}>Tournament</Text><TouchableOpacity onPress={() => setSelectedTournament(null)}><Ionicons name="close" size={24} color="#666" /></TouchableOpacity></View>
-              <View style={styles.tournamentModalHeader}>
-                <Ionicons name="trophy" size={48} color="#FFC107" style={{ marginBottom: 12 }} />
-                <Text style={styles.tournamentModalName}>{selectedTournament.name}</Text>
-              </View>
-              <View style={styles.modalDetailsCard}>
-                {[
-                  { icon: 'football-outline', label: 'Format', value: selectedTournament.format },
-                  { icon: 'business-outline', label: 'Emirate', value: selectedTournament.emirate },
-                  { icon: 'people-outline', label: 'Teams', value: `${selectedTournament.teams?.length || 0} / ${selectedTournament.maxTeams}` },
-                  { icon: 'calendar-outline', label: 'Start Date', value: selectedTournament.startDate },
-                ].map((row, i, arr) => (
-                  <View key={row.label}><View style={styles.modalDetailRow}><Ionicons name={row.icon as any} size={16} color="#666" style={{ width: 24 }} /><Text style={styles.modalDetailLabel}>{row.label}</Text><Text style={styles.modalDetailValue}>{row.value}</Text></View>{i < arr.length - 1 && <View style={styles.modalDivider} />}</View>
-                ))}
-              </View>
-              <TouchableOpacity style={styles.joinBtn} onPress={() => { const id = selectedTournament.id; setSelectedTournament(null); setTimeout(() => router.push(`/tournament/${id}`), 400); }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Ionicons name="add-circle-outline" size={20} color="#000" /><Text style={styles.joinBtnText}>Join Tournament</Text></View>
-              </TouchableOpacity>
-            </ScrollView>
-          )}
-        </View>
-      </Modal>
-
-      <Modal visible={!!mapVenue} animationType="slide" presentationStyle="pageSheet"><View style={styles.modalWrapper}>{mapVenue && <MapView venue={mapVenue} onClose={() => setMapVenue(null)} />}</View></Modal>
       <CustomDialog visible={cancelDialog} title="Cancel Match" message="Are you sure you want to request cancellation?" onClose={() => { setCancelDialog(false); setPendingCancel(null); }} buttons={[{ text: 'No', style: 'cancel', onPress: () => { setCancelDialog(false); setPendingCancel(null); } }, { text: 'Yes, Request Cancel', style: 'destructive', onPress: confirmCancel }]} />
-    </View>
-  );
-}
-
-function MapView({ venue, onClose }: { venue: string; onClose: () => void }) {
-  const insets = useSafeAreaInsets();
-  return (
-    <View style={{ flex: 1, backgroundColor: '#050505', paddingTop: insets.top }}>
-      <TouchableOpacity onPress={onClose} style={{ padding: 16 }}><Text style={{ color: Colors.dark.tint, fontWeight: 'bold' }}>← Back</Text></TouchableOpacity>
-      <View style={{ padding: 20, alignItems: 'center' }}>
-        <Ionicons name="map-outline" size={48} color={Colors.dark.tint} style={{ marginBottom: 16 }} />
-        <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold' }}>{venue}</Text>
-        <Text style={{ color: '#666', marginTop: 8 }}>Venue location on map</Text>
-      </View>
     </View>
   );
 }
@@ -524,20 +422,6 @@ const styles = StyleSheet.create({
   tournamentName: { color: '#fff', fontWeight: 'bold' }, tournamentMeta: { color: '#666', fontSize: 10 }, tournamentDetail: { color: '#666', fontSize: 11 },
   statusPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }, statusPillText: { fontSize: 10, fontWeight: 'bold' },
   emptyState: { alignItems: 'center', marginTop: 60 }, emptyTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 12 }, emptyBtn: { backgroundColor: Colors.dark.tint, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }, emptyBtnText: { fontWeight: 'bold', color: '#000' },
-  modalWrapper: { flex: 1, backgroundColor: '#050505' }, modalContent: { padding: 20 }, modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }, modalTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' }, modalClose: { color: '#666' },
-  modalTeamsRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', marginBottom: 32 }, modalTeam: { alignItems: 'center', flex: 1 }, modalTeamBadge: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center', marginBottom: 8 }, modalTeamBadgeText: { fontSize: 20, fontWeight: 'bold' }, modalTeamName: { color: '#fff', fontWeight: 'bold', textAlign: 'center' }, modalVs: { color: '#333', fontSize: 24, fontWeight: '900' },
-  modalDetailsCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  modalDetailRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }, modalDetailIcon: { width: 24 }, modalDetailLabel: { color: '#666', flex: 1, marginLeft: 8 }, modalDetailValue: { color: '#fff', fontWeight: 'bold' }, modalDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.05)' },
-  disputeBox: { marginTop: 16, padding: 16, backgroundColor: '#FF444415', borderRadius: 12, borderWidth: 1, borderColor: '#FF444430' }, disputeTitle: { color: '#FF4444', fontWeight: 'bold', marginBottom: 8 }, disputeScores: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }, disputeScoreSide: { flex: 1 }, disputeScoreLabel: { color: '#666', fontSize: 10 }, disputeScoreValue: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  mapBtn: { padding: 16, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }, mapBtnText: { color: '#fff', fontWeight: 'bold' },
-  modalActions: { gap: 12 }, modalAcceptBtn: { backgroundColor: Colors.dark.tint, padding: 16, borderRadius: 12, alignItems: 'center' }, modalAcceptBtnText: { fontWeight: 'bold', color: '#000' }, modalDeclineBtn: { borderWidth: 1, borderColor: '#FF4444', padding: 16, borderRadius: 12, alignItems: 'center' }, modalDeclineBtnText: { color: '#FF4444', fontWeight: 'bold' },
-  confirmedBlock: { gap: 12 }, confirmedBlockText: { color: Colors.dark.tint, fontWeight: 'bold', textAlign: 'center', fontSize: 16 },
-  editMatchBtn: { padding: 12, backgroundColor: '#FFC10715', borderRadius: 8, borderWidth: 1, borderColor: '#FFC10730', alignItems: 'center' }, editMatchBtnText: { color: '#FFC107', fontWeight: 'bold' },
-  chatBtn: { padding: 16, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }, chatBtnText: { color: '#fff', fontWeight: 'bold' },
-  submitResultBtn: { padding: 16, backgroundColor: Colors.dark.tint + '20', borderRadius: 12, borderWidth: 1, borderColor: Colors.dark.tint, alignItems: 'center' }, submitResultBtnText: { color: Colors.dark.tint, fontWeight: 'bold' },
-  cancelMatchBtn: { padding: 12, alignItems: 'center' }, cancelMatchBtnText: { color: '#FF4444', fontSize: 12 },
-  tournamentModalHeader: { alignItems: 'center', marginBottom: 24 }, tournamentModalIcon: { fontSize: 48, marginBottom: 12 }, tournamentModalName: { color: '#fff', fontSize: 24, fontWeight: 'bold', textAlign: 'center' },
-  joinBtn: { backgroundColor: Colors.dark.tint, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 24 }, joinBtnText: { fontWeight: 'bold', color: '#000' },
   broadcastCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   broadcastHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   broadcastTeam: { flex: 1, alignItems: 'center' }, broadcastBadge: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 8 }, broadcastBadgeText: { fontWeight: 'bold' }, broadcastTeamName: { color: '#fff', fontSize: 10, fontWeight: 'bold', textAlign: 'center' },

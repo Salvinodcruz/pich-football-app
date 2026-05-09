@@ -31,6 +31,7 @@ export default function SubmitResultScreen() {
   const [playerGoals, setPlayerGoals] = useState<Record<string, number>>({});
   const [playerAssists, setPlayerAssists] = useState<Record<string, number>>({});
   const [myTeamId, setMyTeamId] = useState('');
+  const [matchData, setMatchData] = useState<any>(null);
   const [dialog, setDialog] = useState<{
     visible: boolean;
     title: string;
@@ -38,7 +39,13 @@ export default function SubmitResultScreen() {
     onConfirm: () => void;
   }>({ visible: false, title: '', message: '', onConfirm: () => {} });
 
-  useEffect(() => { loadPlayers(); }, []);
+  useEffect(() => { 
+    const unsub = onSnapshot(doc(db, 'challenges', challengeId), (snap) => {
+      if (snap.exists()) setMatchData(snap.data());
+    });
+    loadPlayers(); 
+    return () => unsub();
+  }, []);
 
   const loadPlayers = async () => {
     try {
@@ -275,30 +282,36 @@ const handleSubmit = async () => {
 
         {/* Score Card */}
         <View style={styles.scoreCard}>
-          <ScoreControl
-            label={myTeamName}
-            score={myCurrentScore}
-            onIncrease={() => amIHome
-              ? setHomeScore(s => s + 1)
-              : setAwayScore(s => s + 1)}
-            onDecrease={() => amIHome
-              ? setHomeScore(s => Math.max(0, s - 1))
-              : setAwayScore(s => Math.max(0, s - 1))}
-          />
-          <View style={styles.vsContainer}>
+          <View style={styles.scoreColumn}>
+            <ScoreControl
+              label={myTeamName}
+              score={myCurrentScore}
+              onIncrease={() => amIHome
+                ? setHomeScore(s => s + 1)
+                : setAwayScore(s => s + 1)}
+              onDecrease={() => amIHome
+                ? setHomeScore(s => Math.max(0, s - 1))
+                : setAwayScore(s => Math.max(0, s - 1))}
+            />
+          </View>
+          
+          <View style={styles.vsColumn}>
             <Text style={styles.vsText}>VS</Text>
             <Text style={styles.scoreSummary}>{myCurrentScore} — {opponentCurrentScore}</Text>
           </View>
-          <ScoreControl
-            label={opponentTeamName}
-            score={opponentCurrentScore}
-            onIncrease={() => amIHome
-              ? setAwayScore(s => s + 1)
-              : setHomeScore(s => s + 1)}
-            onDecrease={() => amIHome
-              ? setAwayScore(s => Math.max(0, s - 1))
-              : setHomeScore(s => Math.max(0, s - 1))}
-          />
+
+          <View style={styles.scoreColumn}>
+            <ScoreControl
+              label={opponentTeamName}
+              score={opponentCurrentScore}
+              onIncrease={() => amIHome
+                ? setAwayScore(s => s + 1)
+                : setHomeScore(s => s + 1)}
+              onDecrease={() => amIHome
+                ? setAwayScore(s => Math.max(0, s - 1))
+                : setHomeScore(s => Math.max(0, s - 1))}
+            />
+          </View>
         </View>
 
         {/* Player Stats Section */}
@@ -441,19 +454,42 @@ const styles = StyleSheet.create({
   subtitle: { color: Colors.dark.textSecondary, fontSize: FontSizes.md, marginBottom: Spacing.xl },
 
   // Score card
-  scoreCard: { backgroundColor: '#141414CC', borderRadius: BorderRadius.md, padding: Spacing.xl, marginBottom: Spacing.lg, borderWidth: 1, borderColor: '#2A2A2A', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  scoreControl: { alignItems: 'center', flex: 1 },
-  scoreTeamLabel: { color: Colors.dark.textSecondary, fontSize: FontSizes.xs, marginBottom: Spacing.sm, textAlign: 'center' },
-  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  scoreBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#0A0A0A', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#2A2A2A' },
-  scoreBtnText: { color: '#fff', fontSize: FontSizes.xl, fontWeight: FontWeights.bold },
-  scoreValue: { color: '#fff', fontSize: FontSizes.xxl, fontWeight: FontWeights.bold, minWidth: 40, textAlign: 'center' },
-  vsContainer: { alignItems: 'center', gap: 4 },
-  vsText: { color: '#666', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
-  scoreSummary: { color: Colors.dark.tint, fontSize: FontSizes.sm, fontWeight: FontWeights.bold },
+  scoreCard: { 
+    backgroundColor: 'rgba(255,255,255,0.03)', 
+    borderRadius: 20, 
+    padding: Spacing.md, 
+    marginBottom: Spacing.lg, 
+    borderWidth: 1, 
+    borderColor: 'rgba(255,255,255,0.05)',
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between' 
+  },
+  scoreColumn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vsColumn: {
+    flex: 0.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  scoreControl: { 
+    alignItems: 'center', 
+    width: '100%',
+  },
+  scoreTeamLabel: { color: '#666', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: Spacing.sm, textAlign: 'center' },
+  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  scoreBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  scoreBtnText: { color: '#fff', fontSize: FontSizes.lg, fontWeight: FontWeights.bold },
+  scoreValue: { color: '#fff', fontSize: 32, fontWeight: FontWeights.bold, minWidth: 36, textAlign: 'center' },
+  vsText: { color: 'rgba(255,255,255,0.2)', fontSize: 14, fontWeight: '900' },
+  scoreSummary: { color: Colors.dark.tint, fontSize: 10, fontWeight: 'bold' },
 
   // Player stats
-  playerStatsSection: { backgroundColor: '#141414CC', borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.lg, borderWidth: 1, borderColor: '#2A2A2A' },
+  playerStatsSection: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: Spacing.md, marginBottom: Spacing.lg, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   playerStatsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   playerStatsTitle: { color: '#fff', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
   playerStatsSubtitle: { color: Colors.dark.tint, fontSize: FontSizes.xs, fontWeight: FontWeights.semibold },

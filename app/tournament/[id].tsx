@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/src/config/firebase';
-import { getTournament, joinTournament } from '@/src/utils/tournamentService';
+import { subscribeToTournament, joinTournament, leaveTournament } from '@/src/utils/tournamentService';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,26 +18,35 @@ export default function TournamentScreen() {
   const router = useRouter();
   const [tournament, setTournament] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [joining, setJoining] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const [userTeamId, setUserTeamId] = useState<string | null>(null);
 
-  useEffect(() => { if (id) load(); }, [id]);
-
-  const load = async () => {
-    try {
-      const user = auth.currentUser;
-      if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        setUserTeamId(userDoc.data()?.teamId || null);
+  useEffect(() => {
+    let unsubscribe: () => void;
+    
+    const init = async () => {
+      try {
+        const user = auth.currentUser;
+        if (user) {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          setUserTeamId(userDoc.data()?.teamId || null);
+        }
+        
+        if (id) {
+          unsubscribe = subscribeToTournament(id, (data) => {
+            setTournament(data);
+            setLoading(false);
+          });
+        }
+      } catch (e) {
+        Alert.alert('Error', 'Could not load tournament');
+        setLoading(false);
       }
-      const data = await getTournament(id);
-      setTournament(data);
-    } catch (e) {
-      Alert.alert('Error', 'Could not load tournament');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    init();
+    return () => unsubscribe?.();
+  }, [id]);
 
   const handleJoin = async () => {
     if (!userTeamId) {
@@ -48,16 +57,42 @@ export default function TournamentScreen() {
       Alert.alert('Full', 'This tournament is full');
       return;
     }
-    setJoining(true);
+    setProcessing(true);
     try {
       await joinTournament(id, userTeamId);
       Alert.alert('Joined! 🏆', 'Your team has been added to the tournament');
-      load();
     } catch (e) {
       Alert.alert('Error', 'Could not join tournament');
     } finally {
-      setJoining(false);
+      setProcessing(false);
     }
+  };
+
+  const handleLeave = async () => {
+    if (!userTeamId) return;
+    
+    Alert.alert(
+      'Leave Tournament',
+      'Are you sure you want to withdraw your team from this tournament?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Withdraw', 
+          style: 'destructive', 
+          onPress: async () => {
+            setProcessing(true);
+            try {
+              await leaveTournament(id, userTeamId);
+              Alert.alert('Withdrawn', 'Your team has left the tournament');
+            } catch (e) {
+              Alert.alert('Error', 'Could not leave tournament');
+            } finally {
+              setProcessing(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   if (loading) return (
@@ -153,25 +188,29 @@ export default function TournamentScreen() {
         </View>
       </View>
 
-      {/* Join Button */}
+      {/* Join/Leave Button */}
       {!isCreator && tournament.status === 'open' && (
         <TouchableOpacity
           style={[
             styles.joinBtn,
-            isJoined && styles.joinedBtn,
-            isFull && styles.fullBtn,
-            joining && styles.joinBtnDisabled,
+            isJoined && styles.leaveBtn,
+            !isJoined && isFull && styles.fullBtn,
+            processing && styles.joinBtnDisabled,
           ]}
-          onPress={isJoined || isFull ? undefined : handleJoin}
-          disabled={joining || isJoined || isFull}
+          onPress={processing ? undefined : (isJoined ? handleLeave : (isFull ? undefined : handleJoin))}
+          disabled={processing || (!isJoined && isFull)}
         >
-          {joining
+          {processing
             ? <ActivityIndicator color="#000" />
             : (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name={isJoined ? "checkmark-circle" : isFull ? "alert-circle" : "add-circle"} size={20} color={isJoined ? Colors.dark.tint : "#000"} />
-                <Text style={[styles.joinBtnText, isJoined && styles.joinedBtnText]}>
-                  {isJoined ? 'Joined' : isFull ? 'Tournament Full' : 'Join Tournament'}
+                <Ionicons 
+                  name={isJoined ? "log-out-outline" : isFull ? "alert-circle" : "add-circle"} 
+                  size={20} 
+                  color={isJoined ? "#FF4444" : "#000"} 
+                />
+                <Text style={[styles.joinBtnText, isJoined && styles.leaveBtnText]}>
+                  {isJoined ? 'Leave Tournament' : isFull ? 'Tournament Full' : 'Join Tournament'}
                 </Text>
               </View>
             )
@@ -213,11 +252,11 @@ const styles = StyleSheet.create({
   progressBar: { height: 8, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: Colors.dark.tint, borderRadius: 4 },
   joinBtn: { backgroundColor: Colors.dark.tint, borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center' },
-  joinedBtn: { backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: Colors.dark.tint },
+  leaveBtn: { backgroundColor: 'rgba(255,68,68,0.1)', borderWidth: 1, borderColor: '#FF4444' },
   fullBtn: { backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   joinBtnDisabled: { opacity: 0.6 },
   joinBtnText: { color: '#000', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
-  joinedBtnText: { color: Colors.dark.tint },
+  leaveBtnText: { color: '#FF4444' },
   creatorBadge: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: Spacing.md, alignItems: 'center', borderWidth: 1, borderColor: '#FFC107' },
   creatorText: { color: '#FFC107', fontSize: FontSizes.sm, fontWeight: FontWeights.semibold },
   errorText: { color: Colors.dark.textSecondary, fontSize: FontSizes.md },

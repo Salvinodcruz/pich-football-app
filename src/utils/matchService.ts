@@ -11,6 +11,40 @@ const sendNotification = async (toUserId: string, data: any) => {
   });
 };
 
+export const parseMatchDateTime = (dateStr: string, timeStr: string): Date | null => {
+  try {
+    const MONTHS: Record<string, number> = {
+      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+    };
+    let cleanDate = dateStr.replace(/^[a-zA-Z]+\s*,\s*/i, '').trim();
+    const dateParts = cleanDate.split(' ');
+    const day = parseInt(dateParts[0]);
+    const monthStr = dateParts[1]?.toLowerCase().substring(0, 3);
+    const year = parseInt(dateParts[2]) || new Date().getFullYear();
+    const month = MONTHS[monthStr];
+    
+    let hours = 0, minutes = 0;
+    if (timeStr) {
+      const timeClean = timeStr.trim();
+      const [hPart, mPart] = timeClean.split(':');
+      hours = parseInt(hPart);
+      minutes = parseInt(mPart);
+      const isPM = timeClean.toUpperCase().includes('PM');
+      const isAM = timeClean.toUpperCase().includes('AM');
+      if (isPM && hours !== 12) hours += 12;
+      if (isAM && hours === 12) hours = 0;
+    }
+    
+    if (!isNaN(day) && month !== undefined && !isNaN(year)) {
+      return new Date(year, month, day, hours, minutes, 0);
+    }
+  } catch (e) {
+    console.log('Date parse failed:', e);
+  }
+  return null;
+};
+
 export const requestCancelMatch = async (
   challengeId: string,
   requestingTeamId: string,
@@ -20,35 +54,10 @@ export const requestCancelMatch = async (
   if (!challengeDoc.exists()) throw new Error('Match not found');
   const data = challengeDoc.data();
 
+  const matchDate = parseMatchDateTime(data.date, data.time);
   let hoursUntilMatch = 999;
-  try {
-    const MONTHS: Record<string, number> = {
-      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
-    };
-    let cleanDate = data.date.replace(/^[a-zA-Z]+\s*,\s*/i, '').trim();
-    const dateParts = cleanDate.split(' ');
-    const day = parseInt(dateParts[0]);
-    const monthStr = dateParts[1]?.toLowerCase().substring(0, 3);
-    const year = parseInt(dateParts[2]) || new Date().getFullYear();
-    const month = MONTHS[monthStr];
-    let hours = 0, minutes = 0;
-    if (data.time) {
-      const timeClean = data.time.trim();
-      const timeParts = timeClean.split(':');
-      hours = parseInt(timeParts[0]);
-      minutes = parseInt(timeParts[1]);
-      const isPM = timeClean.toUpperCase().includes('PM');
-      const isAM = timeClean.toUpperCase().includes('AM');
-      if (isPM && hours !== 12) hours += 12;
-      if (isAM && hours === 12) hours = 0;
-    }
-    if (!isNaN(day) && month !== undefined && !isNaN(year)) {
-      const matchDate = new Date(year, month, day, hours, minutes, 0);
-      hoursUntilMatch = (matchDate.getTime() - Date.now()) / (1000 * 60 * 60);
-    }
-  } catch (e) {
-    console.log('Date parse failed:', e);
+  if (matchDate) {
+    hoursUntilMatch = (matchDate.getTime() - Date.now()) / (1000 * 60 * 60);
   }
 
   // Get other team's captain

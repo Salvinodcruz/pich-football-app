@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { collection, getDocs, orderBy, query, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import PremiumBackground from '@/src/components/PremiumBackground';
@@ -19,25 +19,38 @@ export default function TournamentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  useEffect(() => { loadTournaments(); }, []);
+  useEffect(() => {
+    let unsubscribe: () => void;
+    
+    const init = async () => {
+      try {
+        const user = auth.currentUser;
+        if (user) {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          setIsAdmin(userDoc.data()?.role === 'admin');
+        }
 
-  const loadTournaments = async () => {
-    try {
-      const user = auth.currentUser;
-      if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        setIsAdmin(userDoc.data()?.role === 'admin');
+        const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
+        unsubscribe = onSnapshot(q, (snap) => {
+          setTournaments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+          setLoading(false);
+          setRefreshing(false);
+        });
+      } catch (e) {
+        console.error(e);
+        setLoading(false);
+        setRefreshing(false);
       }
+    };
 
-      const q = query(collection(db, 'tournaments'), orderBy('createdAt', 'desc'));
-      const snap = await getDocs(q);
-      setTournaments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    init();
+    return () => unsubscribe?.();
+  }, []);
+
+  const loadTournaments = () => {
+    setRefreshing(true);
+    // onSnapshot handles the data, we just trigger refresh state if needed
+    // but onSnapshot will update automatically.
   };
 
   const getStatusColor = (status: string) => {

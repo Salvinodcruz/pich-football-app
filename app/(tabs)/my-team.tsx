@@ -80,13 +80,6 @@ export default function MyTeamScreen() {
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
-  // Team chat
-  const [showChat, setShowChat] = useState(false);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [chatText, setChatText] = useState('');
-  const [sendingMsg, setSendingMsg] = useState(false);
-  const chatScrollRef = useRef<ScrollView>(null);
-
   useEffect(() => { load(); }, []);
 
   const load = async () => {
@@ -146,30 +139,6 @@ export default function MyTeamScreen() {
       Alert.alert(approve ? 'Approved!' : 'Denied');
       load();
     } catch (e) { Alert.alert('Error'); }
-  };
-
-  useEffect(() => {
-    if (!team?.id || !showChat) return;
-    const q = query(collection(db, 'teamChats', team.id, 'messages'), orderBy('createdAt', 'asc'));
-    const unsub = onSnapshot(q, snap => {
-      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setTimeout(() => chatScrollRef.current?.scrollToEnd({ animated: true }), 100);
-    });
-    return unsub;
-  }, [team?.id, showChat]);
-
-  const sendMessage = async () => {
-    if (!chatText.trim() || !team || sendingMsg) return;
-    setSendingMsg(true);
-    try {
-      await addDoc(collection(db, 'teamChats', team.id, 'messages'), {
-        text: chatText.trim(),
-        senderId: auth.currentUser?.uid,
-        senderName: myName,
-        createdAt: new Date().toISOString(),
-      });
-      setChatText('');
-    } catch (e) { Alert.alert('Error', 'Could not send message'); } finally { setSendingMsg(false); }
   };
 
   const handleLogoUpload = async () => {
@@ -398,7 +367,10 @@ export default function MyTeamScreen() {
               </View>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={[styles.actionBtnGlass, styles.chatActionBtnGlass]} onPress={() => setShowChat(true)}>
+          <TouchableOpacity 
+            style={[styles.actionBtnGlass, styles.chatActionBtnGlass]} 
+            onPress={() => router.push({ pathname: '/chat-team/[id]', params: { id: team!.id, teamName: team!.name } })}
+          >
              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="chatbubbles-outline" size={14} color="#FFF" />
                 <Text style={styles.chatActionBtnTextGlass}>Team Chat</Text>
@@ -516,53 +488,6 @@ export default function MyTeamScreen() {
             </TouchableOpacity>
           </ScrollView>
         </View>
-      </Modal>
-
-      <Modal visible={showChat} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowChat(false)}>
-        <KeyboardAvoidingView style={styles.modalWrapper} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={[styles.chatHeader, { paddingTop: insets.top + Spacing.sm }]}>
-            <TouchableOpacity onPress={() => setShowChat(false)}>
-              <Ionicons name="arrow-back" size={24} color={Colors.dark.tint} />
-            </TouchableOpacity>
-            <View style={{ flex: 1, marginLeft: 16 }}>
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Team Chat</Text>
-              <Text style={{ color: '#666', fontSize: 10 }}>{team.name}</Text>
-            </View>
-          </View>
-          <ScrollView 
-            ref={chatScrollRef} 
-            style={{ flex: 1 }} 
-            contentContainerStyle={{ padding: 16 }} 
-            showsVerticalScrollIndicator={false}
-            onContentSizeChange={() => chatScrollRef.current?.scrollToEnd()}
-          >
-            {messages.length === 0 ? (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 100 }}>
-                <Ionicons name="chatbubbles-outline" size={48} color="#333" />
-                <Text style={{ color: '#666', marginTop: 12 }}>No messages yet</Text>
-              </View>
-            ) : (
-              messages.map(msg => {
-                const isMe = msg.senderId === myUid;
-                return (
-                  <View key={msg.id} style={[styles.msgBubble, isMe ? styles.myBubble : styles.theirBubble]}>
-                    {!isMe && <Text style={{ color: Colors.dark.tint, fontSize: 10, fontWeight: 'bold', marginBottom: 2 }}>{msg.senderName}</Text>}
-                    <Text style={[styles.msgText, isMe && { color: '#000' }]}>{msg.text}</Text>
-                    <Text style={{ color: isMe ? 'rgba(0,0,0,0.5)' : '#444', fontSize: 8, alignSelf: 'flex-end', marginTop: 2 }}>
-                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                  </View>
-                );
-              })
-            )}
-          </ScrollView>
-          <View style={[styles.chatInputRow, { paddingBottom: insets.bottom + 16 }]}>
-            <TextInput style={styles.chatInput} value={chatText} onChangeText={setChatText} placeholder="Type a message..." placeholderTextColor="#666" multiline />
-            <TouchableOpacity onPress={sendMessage} disabled={!chatText.trim() || sendingMsg} style={{ padding: 4 }}>
-              <Ionicons name="send" size={24} color={(!chatText.trim() || sendingMsg) ? '#333' : Colors.dark.tint} />
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

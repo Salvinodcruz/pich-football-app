@@ -276,12 +276,11 @@ export default function ProfileScreen() {
                 </View>
               )}
             </View>
-            <View style={styles.cameraBtn}>
-              {uploadingPhoto
-                ? <ActivityIndicator size="small" color={Colors.dark.tint} />
-                : <Ionicons name="camera" size={14} color="#FFF" />
-              }
-            </View>
+            {uploadingPhoto && (
+              <View style={styles.uploadingOverlay}>
+                <ActivityIndicator size="small" color={Colors.dark.tint} />
+              </View>
+            )}
           </TouchableOpacity>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -492,14 +491,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 12,
     elevation: 8,
-    overflow: 'hidden',
+    overflow: 'visible',
   },
-  avatarImage: { width: '100%', height: '100%', borderRadius: 48 },
-  avatarPlaceholder: { width: '100%', height: '100%', backgroundColor: '#1A1A1A', justifyContent: 'center', alignItems: 'center' },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 48, overflow: 'hidden' },
+  avatarPlaceholder: { width: '100%', height: '100%', backgroundColor: '#1A1A1A', borderRadius: 48, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   avatarInitials: { fontSize: FontSizes.xl, fontWeight: FontWeights.bold },
-  posBadgeOnAvatar: { position: 'absolute', bottom: 0, right: -2, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1.5, borderColor: '#050505' },
+  posBadgeOnAvatar: { position: 'absolute', bottom: -5, right: -5, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1.5, borderColor: '#050505' },
   posBadgeText: { color: '#000', fontSize: 9, fontWeight: FontWeights.bold },
-  cameraBtn: { position: 'absolute', bottom: -2, right: -2, backgroundColor: '#1A1A1A', borderRadius: 12, width: 24, height: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#2A2A2A' },
+  uploadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 48, justifyContent: 'center', alignItems: 'center' },
   heroName: { fontSize: 22, fontWeight: FontWeights.bold, color: '#fff', marginBottom: 6 },
   heroSubRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: 4 },
   playerIdChip: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1 },
