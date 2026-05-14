@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
@@ -6,8 +6,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/src/config/firebase';
+import { createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
+import { auth, db } from '@/src/config/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { Colors, Spacing, BorderRadius, FontSizes, FontWeights } from '@/constants/theme';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +23,18 @@ export default function SignupScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          router.replace('/(tabs)');
+        }
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   const handleSignup = async () => {
     if (!firstName.trim() || !lastName.trim()) {

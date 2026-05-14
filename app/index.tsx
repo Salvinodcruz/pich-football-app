@@ -7,6 +7,9 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, BorderRadius, FontSizes, FontWeights } from '@/constants/theme';
 import PremiumBackground from '@/src/components/PremiumBackground';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '@/src/config/firebase';
 
 const { height } = Dimensions.get('window');
 
@@ -17,6 +20,19 @@ export default function OnboardingScreen() {
   const slideAnim = useRef(new Animated.Value(40)).current;
 
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Check if profile exists
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          router.replace('/(tabs)');
+        } else {
+          // If no profile, they might have quit during signup
+          router.replace('/signup');
+        }
+      }
+    });
+
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -29,7 +45,9 @@ export default function OnboardingScreen() {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+
+    return unsubscribe;
+  }, [fadeAnim, slideAnim, router]);
 
   return (
     <View style={styles.container}>

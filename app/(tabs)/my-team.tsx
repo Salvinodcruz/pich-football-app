@@ -8,7 +8,7 @@ import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constan
 import type { Team } from '@/src/types';
 import * as ImagePicker from 'expo-image-picker';
 import PremiumBackground from '@/src/components/PremiumBackground';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { startConversation } from '@/src/utils/teamService';
 
 const TEAM_COLORS = ['#00E676', '#FF6B6B', '#4FC3F7', '#FFD54F', '#CE93D8', '#FF8A65'];
@@ -436,14 +436,29 @@ export default function MyTeamScreen() {
                 </View>
                 <View style={[styles.posBadge, { borderColor: getPositionColor(player.teamPosition || player.position) }]}><Text style={[styles.posText, { color: getPositionColor(player.teamPosition || player.position) }]}>{player.teamPosition || player.position || '?'}</Text></View>
                 <View style={{ gap: 2, alignItems: 'flex-end' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="football-outline" size={10} color="#666" />
-                    <Text style={styles.playerStatText}>{player.goals || 0}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Ionicons name="flash-outline" size={10} color="#666" />
-                    <Text style={styles.playerStatText}>{player.assists || 0}</Text>
-                  </View>
+                  {(player.teamPosition === 'GK' || player.position === 'GK') ? (
+                    <>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <MaterialCommunityIcons name="shield-check-outline" size={10} color={Colors.dark.tint} />
+                        <Text style={styles.playerStatText}>{player.totalCleanSheets || 0}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <MaterialCommunityIcons name="hand-front-right-outline" size={10} color={Colors.dark.tint} />
+                        <Text style={styles.playerStatText}>{player.totalSaves || 0}</Text>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Ionicons name="football-outline" size={10} color="#666" />
+                        <Text style={styles.playerStatText}>{player.goals || 0}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <Ionicons name="flash-outline" size={10} color="#666" />
+                        <Text style={styles.playerStatText}>{player.assists || 0}</Text>
+                      </View>
+                    </>
+                  )}
                 </View>
                 {isCaptain && player.id !== team.captainId && (
                   <TouchableOpacity style={{ padding: 4 }} onPress={() => Alert.alert(player.firstName, 'Action', [

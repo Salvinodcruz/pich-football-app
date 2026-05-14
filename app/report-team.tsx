@@ -97,7 +97,7 @@ export default function ReportTeamScreen() {
         <View style={styles.noteBox}>
            <Ionicons name="information-circle-outline" size={14} color="rgba(255,255,255,0.4)" />
            <Text style={styles.reportedNote}>
-            Verified reports will affect this team's trust score and rankings.
+            Verified reports will affect this team&apos;s trust score and rankings.
           </Text>
         </View>
       </View>
@@ -149,7 +149,7 @@ export default function ReportTeamScreen() {
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Ionicons name="warning-outline" size={20} color="#FFC107" />
           <Text style={styles.warningText}>
-            False reports are a violation of community guidelines and will negatively affect YOUR team's trust score.
+            False reports are a violation of community guidelines and will negatively affect YOUR team&apos;s trust score.
           </Text>
         </View>
       </View>

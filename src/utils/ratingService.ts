@@ -1,21 +1,35 @@
 import {
-  collection, getDocs, doc, updateDoc, getDoc, query, where,
+  collection, getDocs, doc, updateDoc, getDoc,
 } from 'firebase/firestore';
 import { db } from '@/src/config/firebase';
 
 // Calculate raw score for a single player
+// Max possible raw score is 70
 export const calculateRawScore = (player: any): number => {
   const goals = player.goals || 0;
   const assists = player.assists || 0;
   const matches = player.matches || player.matchesPlayed || 0;
   const wins = player.wins || 0;
   const trustScore = player.trustScore || 100;
+  
+  const isGK = player.position === 'GK' || player.teamPosition === 'GK';
 
-  // Goals contribution (max 20pts)
-  const goalScore = Math.min(goals * 3, 20);
+  let performanceScore = 0;
 
-  // Assists contribution (max 15pts)
-  const assistScore = Math.min(assists * 2, 15);
+  if (isGK) {
+    // GK Stats (max 35pts total for performance)
+    const saves = player.totalSaves || 0;
+    const cleanSheets = player.totalCleanSheets || 0;
+    
+    const saveScore = Math.min(saves * 0.5, 20); // 1pt per 2 saves, max 20
+    const csScore = Math.min(cleanSheets * 5, 15); // 5pts per clean sheet, max 15
+    performanceScore = saveScore + csScore;
+  } else {
+    // Outfield Stats (max 35pts total for performance)
+    const goalScore = Math.min(goals * 3, 20); // 3pts per goal, max 20
+    const assistScore = Math.min(assists * 2, 15); // 2pts per assist, max 15
+    performanceScore = goalScore + assistScore;
+  }
 
   // Matches contribution (max 10pts)
   const matchScore = Math.min(matches * 1, 10);
@@ -27,38 +41,32 @@ export const calculateRawScore = (player: any): number => {
   // Trust score contribution (max 10pts)
   const trustContrib = Math.round((trustScore / 100) * 10);
 
-  return goalScore + assistScore + matchScore + winScore + trustContrib;
+  return performanceScore + matchScore + winScore + trustContrib;
+};
+
+// Normalized score 0-100 based on max possible raw score (70)
+const normalizeRating = (rawScore: number): number => {
+  const normalized = Math.round((rawScore / 70) * 100);
+  return Math.max(1, Math.min(100, normalized));
 };
 
 // Calculate rating for ALL players and update Firestore
 export const recalculateAllRatings = async (): Promise<void> => {
   try {
     const snap = await getDocs(collection(db, 'users'));
-    const players = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (snap.empty) return;
 
-    if (players.length === 0) return;
-
-    // Calculate raw scores
-    const scores = players.map(p => ({
-      id: p.id,
-      rawScore: calculateRawScore(p),
-    }));
-
-    const rawScores = scores.map(s => s.rawScore);
-    const maxRaw = Math.max(...rawScores);
-    const minRaw = Math.min(...rawScores);
-    const range = maxRaw - minRaw || 1;
-
-    // Normalize to 0-100 and update each player
-    for (const s of scores) {
-      const normalized = Math.round(((s.rawScore - minRaw) / range) * 100);
-      const finalRating = Math.max(1, Math.min(100, normalized));
-      await updateDoc(doc(db, 'users', s.id), {
-        skillRating: finalRating,
-      });
+    for (const d of snap.docs) {
+      const player = d.data();
+      const raw = calculateRawScore(player);
+      const rating = normalizeRating(raw);
+      
+      if (player.skillRating !== rating) {
+        await updateDoc(doc(db, 'users', d.id), { skillRating: rating });
+      }
     }
 
-    console.log('Ratings recalculated for', players.length, 'players');
+    console.log('Ratings recalculated for', snap.docs.length, 'players');
   } catch (e) {
     console.error('Rating calculation error:', e);
   }
@@ -71,25 +79,14 @@ export const updatePlayerRating = async (userId: string): Promise<void> => {
     if (!userDoc.exists()) return;
 
     const player = userDoc.data();
+    const raw = calculateRawScore(player);
+    const rating = normalizeRating(raw);
 
-    // Get all players to normalize against
-    const snap = await getDocs(collection(db, 'users'));
-    const allPlayers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (player.skillRating !== rating) {
+      await updateDoc(doc(db, 'users', userId), { skillRating: rating });
+    }
 
-    const allScores = allPlayers.map(p => calculateRawScore(p));
-    const maxRaw = Math.max(...allScores);
-    const minRaw = Math.min(...allScores);
-    const range = maxRaw - minRaw || 1;
-
-    const myRaw = calculateRawScore(player);
-    const normalized = Math.round(((myRaw - minRaw) / range) * 100);
-    const finalRating = Math.max(1, Math.min(100, normalized));
-
-    await updateDoc(doc(db, 'users', userId), {
-      skillRating: finalRating,
-    });
-
-    console.log(`Player ${userId} rating updated to ${finalRating}`);
+    console.log(`Player ${userId} rating updated to ${rating}`);
   } catch (e) {
     console.error('Single player rating error:', e);
   }

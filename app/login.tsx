@@ -26,8 +26,19 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.replace('/(tabs)');
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Check if profile exists
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { db } = await import('@/src/config/firebase');
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      
+      if (userDoc.exists()) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/signup');
+      }
     } catch (error: any) {
       let message = 'Failed to sign in';
       if (error.code === 'auth/invalid-credential') message = 'Invalid email or password';
@@ -113,7 +124,7 @@ export default function LoginScreen() {
 
           {/* Sign Up Link */}
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
+            <Text style={styles.footerText}>Don&apos;t have an account? </Text>
             <TouchableOpacity onPress={() => router.push('/signup')} disabled={loading}>
               <Text style={styles.link}>Sign Up</Text>
             </TouchableOpacity>

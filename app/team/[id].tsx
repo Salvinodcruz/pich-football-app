@@ -8,7 +8,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import type { Team } from '@/src/types';
 import PremiumBackground from '@/src/components/PremiumBackground';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 
 export default function TeamProfileScreen() {
@@ -195,14 +195,29 @@ export default function TeamProfileScreen() {
                     <Text style={[styles.posText, { color: getPositionColor(player.teamPosition || player.position) }]}>{player.teamPosition || player.position || '?'}</Text>
                   </View>
                   <View style={styles.playerStats}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Ionicons name="football" size={10} color="rgba(255,255,255,0.4)" />
-                      <Text style={styles.playerStatText}>{player.goals || 0}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Ionicons name="star-outline" size={10} color="rgba(255,255,255,0.4)" />
-                      <Text style={styles.playerStatText}>{player.assists || 0}</Text>
-                    </View>
+                    {(player.teamPosition === 'GK' || player.position === 'GK') ? (
+                      <>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <MaterialCommunityIcons name="shield-check-outline" size={10} color={Colors.dark.tint} />
+                          <Text style={styles.playerStatText}>{player.totalCleanSheets || 0}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <MaterialCommunityIcons name="hand-front-right-outline" size={10} color={Colors.dark.tint} />
+                          <Text style={styles.playerStatText}>{player.totalSaves || 0}</Text>
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="football" size={10} color="rgba(255,255,255,0.4)" />
+                          <Text style={styles.playerStatText}>{player.goals || 0}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Ionicons name="star-outline" size={10} color="rgba(255,255,255,0.4)" />
+                          <Text style={styles.playerStatText}>{player.assists || 0}</Text>
+                        </View>
+                      </>
+                    )}
                   </View>
                 </View>
               ))

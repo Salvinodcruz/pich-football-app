@@ -1,18 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef , useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, Switch, Alert, ActivityIndicator,
   TextInput, Image, Modal, Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter , useFocusEffect } from 'expo-router';
 import { signOut } from 'firebase/auth';
 import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import { updatePlayerRating } from '@/src/utils/ratingService';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
-import { useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import SkillHexagon from '@/src/components/SkillHexagon';
@@ -156,11 +154,34 @@ export default function ProfileScreen() {
     } catch (e) { Alert.alert('Error', 'Could not update free agent status'); }
   };
 
+  useEffect(() => {
+    if (showDropdown) {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showDropdown]);
+
   const handleSignOut = async () => {
     setShowDropdown(false);
     Alert.alert('Sign Out', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: async () => { await signOut(auth); router.replace('/login'); } }
+      { text: 'Sign Out', style: 'destructive', onPress: async () => { 
+        try {
+          await signOut(auth); 
+          router.replace('/login'); 
+        } catch (e) {
+          Alert.alert('Error', 'Could not sign out');
+        }
+      } }
     ]);
   };
 
@@ -186,6 +207,48 @@ export default function ProfileScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: '#050505' }}>
       <PremiumBackground />
+      
+      {/* Dropdown Overlay - placed here to be behind dropdown but above content */}
+      {showDropdown && (
+        <TouchableOpacity 
+          style={styles.dropdownOverlay} 
+          onPress={() => setShowDropdown(false)} 
+          activeOpacity={1} 
+        />
+      )}
+
+      {/* Dropdown Menu - placed outside ScrollView for stable absolute positioning */}
+      {showDropdown && (
+        <Animated.View style={[styles.dropdown, { opacity: fadeAnim, transform: [{ translateY: fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) }] }]}>
+          <TouchableOpacity style={styles.dropdownItem} onPress={() => { setShowDropdown(false); setShowEditModal(true); }}>
+            <Ionicons name="pencil-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
+            <Text style={styles.dropdownText}>Edit Profile</Text>
+          </TouchableOpacity>
+          <View style={styles.dropdownDivider} />
+          <TouchableOpacity style={styles.dropdownItem} onPress={() => { setShowDropdown(false); setShowPlayerInfo(true); }}>
+            <Ionicons name="id-card-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
+            <Text style={styles.dropdownText}>Player Info</Text>
+          </TouchableOpacity>
+          <View style={styles.dropdownDivider} />
+          <View style={styles.dropdownItemRow}>
+            <Ionicons name="walk-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
+            <Text style={styles.dropdownText}>Free Agent</Text>
+            <Switch
+              value={isFreeAgent}
+              onValueChange={toggleFreeAgent}
+              trackColor={{ false: Colors.dark.border, true: Colors.dark.tint }}
+              thumbColor={isFreeAgent ? '#000' : '#888'}
+              style={{ marginLeft: 'auto', transform: [{ scale: 0.8 }] }}
+            />
+          </View>
+          <View style={styles.dropdownDivider} />
+          <TouchableOpacity style={styles.dropdownItem} onPress={handleSignOut}>
+            <Ionicons name="log-out-outline" size={18} color="#FF4444" style={styles.dropdownIcon} />
+            <Text style={[styles.dropdownText, { color: '#FF4444' }]}>Sign Out</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
       <ScrollView
         style={styles.container}
         contentContainerStyle={[styles.content, {
@@ -216,39 +279,6 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* Dropdown */}
-        {showDropdown && (
-          <Animated.View style={[styles.dropdown, { opacity: fadeAnim }]}>
-            <TouchableOpacity style={styles.dropdownItem} onPress={() => { setShowDropdown(false); setShowEditModal(true); }}>
-              <Ionicons name="pencil-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
-              <Text style={styles.dropdownText}>Edit Profile</Text>
-            </TouchableOpacity>
-            <View style={styles.dropdownDivider} />
-            <TouchableOpacity style={styles.dropdownItem} onPress={() => { setShowDropdown(false); setShowPlayerInfo(true); }}>
-              <Ionicons name="id-card-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
-              <Text style={styles.dropdownText}>Player Info</Text>
-            </TouchableOpacity>
-            <View style={styles.dropdownDivider} />
-            <View style={styles.dropdownItemRow}>
-              <Ionicons name="walk-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
-              <Text style={styles.dropdownText}>Free Agent</Text>
-              <Switch
-                value={isFreeAgent}
-                onValueChange={toggleFreeAgent}
-                trackColor={{ false: Colors.dark.border, true: Colors.dark.tint }}
-                thumbColor={isFreeAgent ? '#000' : '#888'}
-                style={{ marginLeft: 'auto' }}
-              />
-            </View>
-            <View style={styles.dropdownDivider} />
-            <TouchableOpacity style={styles.dropdownItem} onPress={handleSignOut}>
-              <Ionicons name="log-out-outline" size={18} color="#FF4444" style={styles.dropdownIcon} />
-              <Text style={[styles.dropdownText, { color: '#FF4444' }]}>Sign Out</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-        {showDropdown && <TouchableOpacity style={styles.dropdownOverlay} onPress={() => setShowDropdown(false)} activeOpacity={1} />}
 
         {/* ── Hero Section ── */}
         <View style={styles.heroSection}>

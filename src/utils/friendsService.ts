@@ -1,6 +1,6 @@
 import {
   collection, doc, addDoc, getDoc, getDocs,
-  updateDoc, query, where, orderBy, writeBatch,
+  updateDoc, query, where, orderBy, writeBatch, runTransaction,
 } from 'firebase/firestore';
 import { db } from '@/src/config/firebase';
 
@@ -116,58 +116,64 @@ export const createPickupTeam = async (
   format: string,
   emirate: string,
 ): Promise<string> => {
-  const allPlayers = [captainId, ...friendIds];
-  const docRef = await addDoc(collection(db, 'teams'), {
-    name: teamName,
-    captainId,
-    captainName,
-    players: allPlayers,
-    format,
-    emirate,
-    skillLevel: 'Casual',
-    color: '#4FC3F7',
-    isPickup: true,
-    pickupExpiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-    wins: 0, losses: 0, draws: 0,
-    skillRating: 0, trustScore: 100,
-    createdAt: new Date().toISOString(),
-    teamCode: 'PCT-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
-  });
-
-  // Save permanent team and switch to pickup
-  for (const pid of allPlayers) {
-    const pDoc = await getDoc(doc(db, 'users', pid));
-    const currentTeamId = pDoc.data()?.teamId;
-    await updateDoc(doc(db, 'users', pid), {
-      teamId: docRef.id,
-      permanentTeamId: currentTeamId || null,
+  return await runTransaction(db, async (transaction) => {
+    const teamRef = doc(collection(db, 'teams'));
+    const allPlayers = [captainId, ...friendIds];
+    
+    transaction.set(teamRef, {
+      name: teamName,
+      captainId,
+      captainName,
+      players: allPlayers,
+      format,
+      emirate,
+      skillLevel: 'Casual',
+      color: '#4FC3F7',
+      isPickup: true,
+      pickupExpiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+      wins: 0, losses: 0, draws: 0,
+      skillRating: 0, trustScore: 100,
+      createdAt: new Date().toISOString(),
+      teamCode: 'PCT-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
     });
-  }
 
-  return docRef.id;
+    for (const pid of allPlayers) {
+      const pRef = doc(db, 'users', pid);
+      const pSnap = await transaction.get(pRef);
+      if (pSnap.exists()) {
+        const currentTeamId = pSnap.data().teamId;
+        transaction.update(pRef, {
+          teamId: teamRef.id,
+          permanentTeamId: currentTeamId || null,
+        });
+      }
+    }
+
+    return teamRef.id;
+  });
 };
 
 export const deletePickupTeam = async (teamId: string): Promise<void> => {
-  const teamDoc = await getDoc(doc(db, 'teams', teamId));
-  if (!teamDoc.exists()) return;
-  const data = teamDoc.data();
+  return await runTransaction(db, async (transaction) => {
+    const teamRef = doc(db, 'teams', teamId);
+    const teamSnap = await transaction.get(teamRef);
+    if (!teamSnap.exists()) return;
+    const data = teamSnap.data();
 
-  const batch = writeBatch(db);
-
-  // Switch all players back to their permanent team
-  for (const pid of data.players || []) {
-    const pDoc = await getDoc(doc(db, 'users', pid));
-    if (pDoc.exists() && pDoc.data().teamId === teamId) {
-      const permTeamId = pDoc.data().permanentTeamId || null;
-      batch.update(doc(db, 'users', pid), {
-        teamId: permTeamId,
-        permanentTeamId: null,
-      });
+    for (const pid of data.players || []) {
+      const pRef = doc(db, 'users', pid);
+      const pSnap = await transaction.get(pRef);
+      if (pSnap.exists() && pSnap.data().teamId === teamId) {
+        const permTeamId = pSnap.data().permanentTeamId || null;
+        transaction.update(pRef, {
+          teamId: permTeamId,
+          permanentTeamId: null,
+        });
+      }
     }
-  }
 
-  batch.delete(doc(db, 'teams', teamId));
-  await batch.commit();
+    transaction.delete(teamRef);
+  });
 };
 
 
@@ -185,19 +191,11 @@ export const cleanupExpiredPickupTeams = async (): Promise<void> => {
   const snap = await getDocs(
     query(collection(db, 'teams'), where('isPickup', '==', true))
   );
-  const batch = writeBatch(db);
+  
   for (const d of snap.docs) {
     const data = d.data();
     if (data.pickupExpiresAt && data.pickupExpiresAt < now) {
-      // Remove team from all players but keep their stats
-      for (const pid of data.players || []) {
-        const pDoc = await getDoc(doc(db, 'users', pid));
-        if (pDoc.exists() && pDoc.data().teamId === d.id) {
-          batch.update(doc(db, 'users', pid), { teamId: null });
-        }
-      }
-      batch.delete(d.ref);
+      await deletePickupTeam(d.id);
     }
   }
-  await batch.commit();
 };

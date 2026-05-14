@@ -232,7 +232,7 @@ export default function ChallengesScreen() {
         {challenge.message ? (
           <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
             <Ionicons name="chatbubble-outline" size={14} color={Colors.dark.textSecondary} style={{ marginTop: 2 }} />
-            <Text style={styles.messageText}>"{challenge.message}"</Text>
+            <Text style={styles.messageText}>&quot;{challenge.message}&quot;</Text>
           </View>
         ) : null}
       </View>

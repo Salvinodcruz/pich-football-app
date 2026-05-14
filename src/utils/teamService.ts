@@ -10,6 +10,7 @@ import {
   writeBatch,
   arrayUnion,
   deleteDoc,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from '@/src/config/firebase';
 import type { Team } from '@/src/types';
@@ -19,31 +20,35 @@ export const createTeam = async (
   teamData: Omit<Team, 'id' | 'wins' | 'losses' | 'draws' | 'skillRating' | 'trustScore' | 'createdAt' | 'players'>,
   userId: string
 ): Promise<string> => {
+  return await runTransaction(db, async (transaction) => {
+    const userRef = doc(db, 'users', userId);
+    const userSnap = await transaction.get(userRef);
+    if (!userSnap.exists()) throw new Error('User not found');
+    if (userSnap.data().teamId) throw new Error('You are already in a team');
+
     const teamCode = 'PCT-' + Math.random().toString(36).substring(2, 7).toUpperCase();
+    const teamRef = doc(collection(db, 'teams'));
 
     const newTeam = {
       ...teamData,
       teamCode,
-    players: [userId],
-    wins: 0,
-    losses: 0,
-    draws: 0,
-    skillRating: 0.0,
-    trustScore: 100,
-    createdAt: new Date().toISOString(),
-  };
+      players: [userId],
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      skillRating: 0.0,
+      trustScore: 100,
+      createdAt: new Date().toISOString(),
+    };
 
+    transaction.set(teamRef, newTeam);
+    transaction.update(userRef, {
+      teamId: teamRef.id,
+      isFreeAgent: false,
+    });
 
-
-  const docRef = await addDoc(collection(db, 'teams'), newTeam);
-
-  // Update user's teamId
-  await updateDoc(doc(db, 'users', userId), {
-    teamId: docRef.id,
-    isFreeAgent: false,
+    return teamRef.id;
   });
-
-  return docRef.id;
 };
 
 // Get a team by ID
@@ -55,36 +60,40 @@ export const getTeam = async (teamId: string): Promise<Team | null> => {
   return null;
 };
 
-// Respond to join request (Refined with writeBatch)
+// Respond to join request
 export const respondToJoinRequest = async (requestId: string, approve: boolean): Promise<void> => {
-  const reqDoc = await getDoc(doc(db, 'teamJoinRequests', requestId));
-  if (!reqDoc.exists()) return;
-  const data = reqDoc.data();
+  return await runTransaction(db, async (transaction) => {
+    const reqRef = doc(db, 'teamJoinRequests', requestId);
+    const reqSnap = await transaction.get(reqRef);
+    if (!reqSnap.exists()) return;
+    const data = reqSnap.data();
 
-  const batch = writeBatch(db);
+    if (approve) {
+      const teamRef = doc(db, 'teams', data.teamId);
+      const userRef = doc(db, 'users', data.userId);
+      const userSnap = await transaction.get(userRef);
+      
+      if (userSnap.exists() && userSnap.data().teamId) {
+        throw new Error('User is already in a team');
+      }
 
-  if (approve) {
-    const teamRef = doc(db, 'teams', data.teamId);
-    const userRef = doc(db, 'users', data.userId);
+      transaction.update(teamRef, { players: arrayUnion(data.userId) });
+      transaction.update(userRef, { teamId: data.teamId, isFreeAgent: false });
+      transaction.delete(reqRef);
 
-    batch.update(teamRef, { players: arrayUnion(data.userId) });
-    batch.update(userRef, { teamId: data.teamId, isFreeAgent: false });
-    batch.delete(doc(db, 'teamJoinRequests', requestId));
-
-    // Notify player
-    const notifRef = doc(collection(db, 'notifications'));
-    batch.set(notifRef, {
-      type: 'join_approved',
-      toUserId: data.userId,
-      teamId: data.teamId,
-      createdAt: new Date().toISOString(),
-      read: false,
-    });
-  } else {
-    batch.delete(doc(db, 'teamJoinRequests', requestId));
-  }
-
-  await batch.commit();
+      // Notify player
+      const notifRef = doc(collection(db, 'notifications'));
+      transaction.set(notifRef, {
+        type: 'join_approved',
+        toUserId: data.userId,
+        teamId: data.teamId,
+        createdAt: new Date().toISOString(),
+        read: false,
+      });
+    } else {
+      transaction.delete(reqRef);
+    }
+  });
 };
 
 // Invite player to team
@@ -125,19 +134,29 @@ export const getAllTeams = async (): Promise<Team[]> => {
 
 // Add player to team
 export const addPlayerToTeam = async (teamId: string, userId: string): Promise<void> => {
-  const teamDoc = await getDoc(doc(db, 'teams', teamId));
-  if (teamDoc.exists()) {
-    const players = teamDoc.data().players || [];
-    if (!players.includes(userId)) {
-      await updateDoc(doc(db, 'teams', teamId), {
-        players: [...players, userId],
-      });
-      await updateDoc(doc(db, 'users', userId), {
-        teamId: teamId,
-        isFreeAgent: false,
-      });
+  return await runTransaction(db, async (transaction) => {
+    const teamRef = doc(db, 'teams', teamId);
+    const userRef = doc(db, 'users', userId);
+    
+    const [teamSnap, userSnap] = await Promise.all([
+      transaction.get(teamRef),
+      transaction.get(userRef)
+    ]);
+
+    if (teamSnap.exists() && userSnap.exists()) {
+      const teamData = teamSnap.data();
+      const players = teamData.players || [];
+      if (!players.includes(userId)) {
+        transaction.update(teamRef, {
+          players: arrayUnion(userId),
+        });
+        transaction.update(userRef, {
+          teamId: teamId,
+          isFreeAgent: false,
+        });
+      }
     }
-  }
+  });
 };
 
 // Request to join a team

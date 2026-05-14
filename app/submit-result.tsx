@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Image,
+  TouchableOpacity, ActivityIndicator, Image, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { doc, updateDoc, getDoc, collection, addDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import { recalculateAllRatings } from '@/src/utils/ratingService';
+import { submitMatchResult } from '@/src/utils/matchService';
 import CustomDialog from '@/src/components/CustomDialog';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -30,7 +31,7 @@ export default function SubmitResultScreen() {
   const [myPlayers, setMyPlayers] = useState<any[]>([]);
   const [playerGoals, setPlayerGoals] = useState<Record<string, number>>({});
   const [playerAssists, setPlayerAssists] = useState<Record<string, number>>({});
-  const [playerIsGK, setPlayerIsGK] = useState<Record<string, boolean>>({});
+  const [goalkeeperId, setGoalkeeperId] = useState<string | null>(null);
   const [playerSaves, setPlayerSaves] = useState<Record<string, number>>({});
   const [playerCleanSheets, setPlayerCleanSheets] = useState<Record<string, boolean>>({});
   const [myTeamId, setMyTeamId] = useState('');
@@ -63,9 +64,15 @@ export default function SubmitResultScreen() {
       const profiles: any[] = [];
       for (const pid of playerIds) {
         const pDoc = await getDoc(doc(db, 'users', pid));
-        if (pDoc.exists()) profiles.push({ id: pDoc.id, ...pDoc.data() });
+        if (pDoc.exists()) {
+          const pData = pDoc.id === user.uid ? { ...pDoc.data(), ...userDoc.data() } : pDoc.data();
+          profiles.push({ id: pDoc.id, ...pData });
+        }
       }
       setMyPlayers(profiles);
+      // Auto-set GK if player has GK position or teamPosition
+      const defaultGK = profiles.find(p => p.teamPosition === 'GK' || p.position === 'GK');
+      if (defaultGK) setGoalkeeperId(defaultGK.id);
     } catch (e) {
       console.error(e);
     } finally {
@@ -83,95 +90,50 @@ export default function SubmitResultScreen() {
   const opponentTeamName = amIHome ? awayTeam : homeTeam;
   const myCurrentScore = amIHome ? homeScore : awayScore;
   const opponentCurrentScore = amIHome ? awayScore : homeScore;
-  const myScore = myCurrentScore;
 
 const handleSubmit = async () => {
+  if (totalGoalsAssigned > myCurrentScore) {
+    Alert.alert('Error', 'Assigned goals exceed total score');
+    return;
+  }
+
   setSubmitting(true);
   try {
-    const challengeDoc = await getDoc(doc(db, 'challenges', challengeId));
-    if (!challengeDoc.exists()) {
-      setSubmitting(false);
-      return;
-    }
-
-    const data = challengeDoc.data();
-    const field = isHome === 'true' ? 'homeScoreSubmitted' : 'awayScoreSubmitted';
-    const otherField = isHome === 'true' ? 'awayScoreSubmitted' : 'homeScoreSubmitted';
     const scoreToSubmit = { home: homeScore, away: awayScore };
 
       // Save player stats with submission
       const playerStatsSubmission = myPlayers.map(p => ({
         playerId: p.id,
         playerName: `${p.firstName || ''} ${p.lastName || ''}`.trim() || p.name || 'Player',
-        goals: playerIsGK[p.id] ? 0 : (playerGoals[p.id] || 0),
+        goals: goalkeeperId === p.id ? 0 : (playerGoals[p.id] || 0),
         assists: playerAssists[p.id] || 0,
-        isGK: playerIsGK[p.id] || false,
-        saves: playerIsGK[p.id] ? (playerSaves[p.id] || 0) : 0,
-        cleanSheet: playerIsGK[p.id] ? (playerCleanSheets[p.id] || false) : false,
-        photoURL: p.photoURL || null,
+        isGK: goalkeeperId === p.id,
+        saves: goalkeeperId === p.id ? (playerSaves[p.id] || 0) : 0,
+        cleanSheet: goalkeeperId === p.id ? (playerCleanSheets[p.id] || false) : false,
       }));
 
-      await updateDoc(doc(db, 'challenges', challengeId), {
-        [field]: scoreToSubmit,
-        [`${field}PlayerStats`]: playerStatsSubmission,
-      });
+      const result = await submitMatchResult(
+        challengeId,
+        myTeamId,
+        amIHome,
+        scoreToSubmit,
+        playerStatsSubmission,
+        matchData
+      );
 
-      // Notify the other captain about the submission
-      try {
-        const otherTeamId = isHome === 'true' ? data.toTeamId : data.fromTeamId;
-        const otherTeamDoc = await getDoc(doc(db, 'teams', otherTeamId));
-        const otherCaptainId = otherTeamDoc.data()?.captainId;
-        if (otherCaptainId) {
-          await addDoc(collection(db, 'notifications'), {
-            type: 'result_submitted',
-            toUserId: otherCaptainId,
-            fromTeamName: myTeamName,
-            matchDate: data.date,
-            matchTime: data.time,
-            challengeId,
-            status: 'pending',
-            read: false,
-            createdAt: new Date().toISOString(),
-          });
-        }
-      } catch (e) {
-        console.error('Result notification error:', e);
-      }
-
-      if (data[otherField]) {
-        const other = data[otherField];
-        
-        if (other.home === homeScore && other.away === awayScore) {
-          await updateDoc(doc(db, 'challenges', challengeId), {
-            status: 'completed',
-            finalScore: scoreToSubmit,
-            completedAt: new Date().toISOString(),
-            // Keep result card for 24hrs
-            resultExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          });
-
-          // Update team stats
-          await updateTeamStats(data, homeScore, awayScore);
-
-          // Update individual player goals/assists
-          await updatePlayerStats(playerStatsSubmission);
-
-          // Recalculate ratings
-          await recalculateAllRatings();
-
-          showResult(
-            'Result Confirmed!',
-            `${homeTeam} ${homeScore} - ${awayScore} ${awayTeam}\n\nPlayer stats have been updated!`,
-            () => router.replace('/(tabs)/my-team')
-          );
-        } else {
-          await updateDoc(doc(db, 'challenges', challengeId), { status: 'disputed' });
-          showResult(
-            'Score Disputed',
-            `Your score: ${homeScore} - ${awayScore}\nTheir score: ${other.home} - ${other.away}\n\nAn admin will review.`,
-            () => router.replace('/(tabs)/my-team')
-          );
-        }
+      if (result.status === 'confirmed') {
+        await recalculateAllRatings();
+        showResult(
+          'Result Confirmed!',
+          `${homeTeam} ${homeScore} - ${awayScore} ${awayTeam}\n\nPlayer stats have been updated!`,
+          () => router.replace('/(tabs)/my-team')
+        );
+      } else if (result.status === 'disputed') {
+        showResult(
+          'Score Disputed',
+          `Your score: ${homeScore} - ${awayScore}\n\nAn admin will review.`,
+          () => router.replace('/(tabs)/my-team')
+        );
       } else {
         showResult(
           'Score Submitted',
@@ -184,67 +146,6 @@ const handleSubmit = async () => {
       showResult('Error', 'Could not submit result. Please try again.', () => {});
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const updatePlayerStats = async (stats: any[]) => {
-    for (const stat of stats) {
-      if (stat.goals === 0 && stat.assists === 0 && (!stat.isGK || (stat.saves === 0 && !stat.cleanSheet))) continue;
-      try {
-        const pDoc = await getDoc(doc(db, 'users', stat.playerId));
-        if (pDoc.exists()) {
-          const pData = pDoc.data();
-          const updates: any = {
-            goals: (pData.goals || 0) + stat.goals,
-            assists: (pData.assists || 0) + stat.assists,
-          };
-          if (stat.isGK) {
-            updates.totalSaves = (pData.totalSaves || 0) + (stat.saves || 0);
-            if (stat.cleanSheet) {
-              updates.totalCleanSheets = (pData.totalCleanSheets || 0) + 1;
-            }
-          }
-          await updateDoc(doc(db, 'users', stat.playerId), updates);
-        }
-      } catch (e) {
-        console.error('Player stat update error:', e);
-      }
-    }
-  };
-
-  const updateTeamStats = async (matchData: any, home: number, away: number) => {
-    try {
-      const fromTeamRef = doc(db, 'teams', matchData.fromTeamId);
-      const toTeamRef = doc(db, 'teams', matchData.toTeamId);
-      const fromTeamDoc = await getDoc(fromTeamRef);
-      const toTeamDoc = await getDoc(toTeamRef);
-      if (!fromTeamDoc.exists() || !toTeamDoc.exists()) return;
-      const fromData = fromTeamDoc.data();
-      const toData = toTeamDoc.data();
-
-      if (home > away) {
-        await updateDoc(fromTeamRef, { wins: (fromData.wins || 0) + 1 });
-        await updateDoc(toTeamRef, { losses: (toData.losses || 0) + 1 });
-      } else if (away > home) {
-        await updateDoc(fromTeamRef, { losses: (fromData.losses || 0) + 1 });
-        await updateDoc(toTeamRef, { wins: (toData.wins || 0) + 1 });
-      } else {
-        await updateDoc(fromTeamRef, { draws: (fromData.draws || 0) + 1 });
-        await updateDoc(toTeamRef, { draws: (toData.draws || 0) + 1 });
-      }
-
-      const allPlayerIds = [...(fromData.players || []), ...(toData.players || [])];
-      for (const pid of allPlayerIds) {
-        const pDoc = await getDoc(doc(db, 'users', pid));
-        if (pDoc.exists()) {
-          const pData = pDoc.data();
-          await updateDoc(doc(db, 'users', pid), {
-            matches: (pData.matches || pData.matchesPlayed || 0) + 1,
-          });
-        }
-      }
-    } catch (e) {
-      console.error('Team stats update error:', e);
     }
   };
 
@@ -333,7 +234,7 @@ const handleSubmit = async () => {
             <View style={styles.playerStatsHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="football" size={18} color="#fff" />
-                <Text style={styles.playerStatsTitle}>{myTeamName}'s Scorers</Text>
+                <Text style={styles.playerStatsTitle}>{myTeamName}&apos;s Match Stats</Text>
               </View>
               <Text style={styles.playerStatsSubtitle}>
                 {totalGoalsAssigned}/{myCurrentScore} goals assigned
@@ -345,14 +246,14 @@ const handleSubmit = async () => {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Ionicons name="warning-outline" size={14} color="#FFC107" />
                   <Text style={styles.warningText}>
-                    Goals assigned ({totalGoalsAssigned}) exceed {myTeamName}'s score ({myCurrentScore})
+                    Goals assigned ({totalGoalsAssigned}) exceed {myTeamName}&apos;s score ({myCurrentScore})
                   </Text>
                 </View>
               </View>
             )}
 
             {myPlayers.map(player => {
-              const isGK = playerIsGK[player.id] || false;
+              const isGK = goalkeeperId === player.id;
               const goals = playerGoals[player.id] || 0;
               const assists = playerAssists[player.id] || 0;
               const saves = playerSaves[player.id] || 0;
@@ -380,7 +281,7 @@ const handleSubmit = async () => {
                     <Text style={styles.playerName} numberOfLines={1}>{name}</Text>
                     <TouchableOpacity 
                       style={[styles.gkChip, isGK && styles.gkChipActive]}
-                      onPress={() => setPlayerIsGK(prev => ({ ...prev, [player.id]: !isGK }))}
+                      onPress={() => setGoalkeeperId(isGK ? null : player.id)}
                     >
                       <Text style={[styles.gkChipText, isGK && styles.gkChipTextActive]}>GK</Text>
                     </TouchableOpacity>
