@@ -20,15 +20,25 @@ export default function OnboardingScreen() {
   const slideAnim = useRef(new Animated.Value(40)).current;
 
   useEffect(() => {
+    let isMounted = true;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // Check if profile exists
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          router.replace('/(tabs)');
-        } else {
-          // If no profile, they might have quit during signup
-          router.replace('/signup');
+      if (user && isMounted) {
+        try {
+          // Check if profile exists
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            router.replace('/(tabs)');
+          } else {
+            // If no profile, they might have quit during signup
+            // We only redirect to signup if we are still on the onboarding screen
+            // and the user is actually signed in.
+            // Using a slight delay to ensure other navigation finishes
+            setTimeout(() => {
+              if (isMounted) router.replace('/signup');
+            }, 500);
+          }
+        } catch (error) {
+          console.error('Error checking user profile:', error);
         }
       }
     });
@@ -46,7 +56,10 @@ export default function OnboardingScreen() {
       }),
     ]).start();
 
-    return unsubscribe;
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [fadeAnim, slideAnim, router]);
 
   return (

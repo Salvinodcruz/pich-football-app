@@ -64,6 +64,9 @@ export default function MyTeamScreen() {
   const [isCaptain, setIsCaptain] = useState(false);
   const [myName, setMyName] = useState('');
   const [joinRequests, setJoinRequests] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'team' | 'recruitment'>('team');
+  const [freeAgents, setFreeAgents] = useState<any[]>([]);
+  const [loadingAgents, setLoadingAgents] = useState(false);
 
   // Add player
   const [showAddPlayer, setShowAddPlayer] = useState(false);
@@ -91,6 +94,11 @@ export default function MyTeamScreen() {
       const userData = userDoc.data();
       setMyName(`${userData?.firstName || ''} ${userData?.lastName || ''}`.trim() || 'Player');
       const teamId = userData?.teamId;
+
+      if (activeTab === 'recruitment') {
+        loadFreeAgents();
+      }
+
       if (!teamId) { setLoading(false); return; }
 
       const teamDoc = await getDoc(doc(db, 'teams', teamId));
@@ -130,6 +138,33 @@ export default function MyTeamScreen() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const loadFreeAgents = async () => {
+    setLoadingAgents(true);
+    try {
+      const q = query(collection(db, 'users'), where('isFreeAgent', '==', true));
+      const snap = await getDocs(q);
+      const all = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter((p: any) => p.id !== auth.currentUser?.uid);
+      setFreeAgents(all);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingAgents(false);
+    }
+  };
+
+  const handleRecruit = async (player: any) => {
+    if (!isCaptain || !team) return;
+    try {
+      const { invitePlayerToTeam } = await import('@/src/utils/teamService');
+      await invitePlayerToTeam(team.id, team.name, auth.currentUser!.uid, player.id);
+      Alert.alert('Invite Sent! ✅', `${player.firstName || 'Player'} has been invited.`);
+    } catch (e) {
+      Alert.alert('Error', 'Could not send invite');
     }
   };
 
@@ -276,7 +311,27 @@ export default function MyTeamScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={Colors.dark.tint} />}
       >
-        <View style={styles.headerGlass}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <Text style={styles.pageTitle}>My Team</Text>
+          <View style={styles.tabContainer}>
+            <TouchableOpacity 
+              style={[styles.tabBtn, activeTab === 'team' && styles.tabBtnActive]} 
+              onPress={() => setActiveTab('team')}
+            >
+              <Text style={[styles.tabBtnText, activeTab === 'team' && styles.tabBtnTextActive]}>Team</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.tabBtn, activeTab === 'recruitment' && styles.tabBtnActive]} 
+              onPress={() => { setActiveTab('recruitment'); loadFreeAgents(); }}
+            >
+              <Text style={[styles.tabBtnText, activeTab === 'recruitment' && styles.tabBtnTextActive]}>Recruitment</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {activeTab === 'team' ? (
+          <>
+            <View style={styles.headerGlass}>
           <TouchableOpacity style={[styles.teamBadge, { backgroundColor: (team as any).color || Colors.dark.tint }]} onPress={isCaptain ? handleLogoUpload : undefined} disabled={uploadingLogo}>
             {uploadingLogo ? <ActivityIndicator color="#000" size="small" /> : (team as any).logoURL ? <Image source={{ uri: (team as any).logoURL }} style={styles.teamLogoImg} /> : <Text style={styles.teamBadgeText}>{team.name.substring(0, 2).toUpperCase()}</Text>}
             {isCaptain && !(team as any).logoURL && (
@@ -425,7 +480,11 @@ export default function MyTeamScreen() {
           <Text style={styles.sectionTitle}>Squad ({players.length})</Text>
           <View style={styles.glassContainer}>
             {players.map((player, i) => (
-              <View key={player.id} style={[styles.playerRowGlass, i === players.length - 1 && { borderBottomWidth: 0 }]}>
+              <TouchableOpacity 
+                key={player.id} 
+                style={[styles.playerRowGlass, i === players.length - 1 && { borderBottomWidth: 0 }]}
+                onPress={() => router.push({ pathname: '/player-profile', params: { id: player.id } })}
+              >
                 {player.photoURL ? <Image source={{ uri: player.photoURL }} style={styles.playerAvatarImg} /> : <View style={styles.playerAvatar}><Text style={styles.playerAvatarText}>{(player.firstName || 'P')[0]}</Text></View>}
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -461,25 +520,70 @@ export default function MyTeamScreen() {
                   )}
                 </View>
                 {isCaptain && player.id !== team.captainId && (
-                  <TouchableOpacity style={{ padding: 4 }} onPress={() => Alert.alert(player.firstName, 'Action', [
-                    { text: '👑 Captain', onPress: () => transferCaptaincy(player.id, player.firstName) },
-                    { text: '📍 Position', onPress: () => Alert.alert('Position', 'Select', [
-                      { text: 'GK', onPress: () => changePlayerPosition(player.id, 'GK') },
-                      { text: 'DEF', onPress: () => changePlayerPosition(player.id, 'DEF') },
-                      { text: 'MID', onPress: () => changePlayerPosition(player.id, 'MID') },
-                      { text: 'FWD', onPress: () => changePlayerPosition(player.id, 'FWD') },
-                      { text: 'Cancel', style: 'cancel' }
-                    ])},
-                    { text: '🗑 Remove', style: 'destructive', onPress: () => removePlayer(player.id, player.firstName) },
-                    { text: 'Cancel', style: 'cancel' }
-                  ])}>
+                  <TouchableOpacity 
+                    style={{ padding: 4 }} 
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      Alert.alert(player.firstName, 'Action', [
+                        { text: '👑 Captain', onPress: () => transferCaptaincy(player.id, player.firstName) },
+                        { text: '📍 Position', onPress: () => Alert.alert('Position', 'Select', [
+                          { text: 'GK', onPress: () => changePlayerPosition(player.id, 'GK') },
+                          { text: 'DEF', onPress: () => changePlayerPosition(player.id, 'DEF') },
+                          { text: 'MID', onPress: () => changePlayerPosition(player.id, 'MID') },
+                          { text: 'FWD', onPress: () => changePlayerPosition(player.id, 'FWD') },
+                          { text: 'Cancel', style: 'cancel' }
+                        ])},
+                        { text: '🗑 Remove', style: 'destructive', onPress: () => removePlayer(player.id, player.firstName) },
+                        { text: 'Cancel', style: 'cancel' }
+                      ]);
+                    }}
+                  >
                     <Ionicons name="ellipsis-horizontal" size={16} color="#666" />
                   </TouchableOpacity>
                 )}
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         </View>
+        </>
+        ) : (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Free Agents Board</Text>
+            {loadingAgents ? (
+              <ActivityIndicator color={Colors.dark.tint} style={{ marginTop: 20 }} />
+            ) : freeAgents.length === 0 ? (
+              <Text style={styles.emptyText}>No free agents found</Text>
+            ) : (
+              <View style={styles.list}>
+                {freeAgents.map((player: any) => (
+                  <View key={player.id} style={styles.agentCardGlass}>
+                    <View style={styles.agentHeader}>
+                      <View style={styles.agentAvatar}>
+                        <Text style={styles.agentAvatarText}>{(player.firstName || 'P')[0]}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.agentName}>{player.firstName} {player.lastName}</Text>
+                        <Text style={styles.agentMeta}>{player.emirate} · {player.position}</Text>
+                      </View>
+                      <View style={styles.agentRating}>
+                        <Ionicons name="star" size={12} color={Colors.dark.tint} />
+                        <Text style={styles.agentRatingText}>{player.skillRating || 0}</Text>
+                      </View>
+                    </View>
+                    {isCaptain && (
+                      <TouchableOpacity 
+                        style={styles.recruitActionBtn}
+                        onPress={() => handleRecruit(player)}
+                      >
+                        <Text style={styles.recruitActionBtnText}>Invite to Team</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
       </ScrollView>
 
       <Modal visible={showEditTeam} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowEditTeam(false)}>
@@ -522,7 +626,13 @@ export default function MyTeamScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 }, content: { padding: Spacing.lg }, center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#050505' },
-  pageTitle: { fontSize: 28, fontWeight: 'bold', color: '#fff', marginBottom: 8 }, noTeamSubtitle: { color: '#666', fontSize: 16, marginBottom: 24 },
+  pageTitle: { fontSize: 28, fontWeight: 'bold', color: '#fff' },
+  tabContainer: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  tabBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8 },
+  tabBtnActive: { backgroundColor: Colors.dark.tint },
+  tabBtnText: { color: '#888', fontSize: 12, fontWeight: 'bold' },
+  tabBtnTextActive: { color: '#000' },
+  noTeamSubtitle: { color: '#666', fontSize: 16, marginBottom: 24 },
   options: { gap: 16 }, optionCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', gap: 16 },
   optionTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' }, ctaBtn: { backgroundColor: Colors.dark.tint, borderRadius: 8, padding: 12, alignItems: 'center' }, ctaBtnText: { fontWeight: 'bold', color: '#000' },
   headerGlass: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 20, padding: 16, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
@@ -571,4 +681,16 @@ const styles = StyleSheet.create({
   optionBtnActive: { backgroundColor: Colors.dark.tint + '20', borderColor: Colors.dark.tint },
   optionText: { color: '#666', fontSize: 12, fontWeight: 'bold' },
   optionTextActive: { color: Colors.dark.tint },
+  list: { gap: 12 },
+  agentCardGlass: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  agentHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  agentAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  agentAvatarText: { color: Colors.dark.tint, fontWeight: 'bold' },
+  agentName: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+  agentMeta: { color: '#666', fontSize: 10 },
+  agentRating: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(0,230,118,0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  agentRatingText: { color: Colors.dark.tint, fontSize: 12, fontWeight: 'bold' },
+  recruitActionBtn: { backgroundColor: Colors.dark.tint, borderRadius: 8, padding: 10, alignItems: 'center' },
+  recruitActionBtnText: { color: '#000', fontWeight: 'bold', fontSize: 12 },
+  emptyText: { color: 'rgba(255,255,255,0.3)', fontSize: 14, textAlign: 'center', marginTop: 20 },
 });

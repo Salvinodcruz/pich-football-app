@@ -23,8 +23,10 @@ export default function PlayerProfileScreen() {
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
-    const unsub = onSnapshot(doc(db, 'users', id), (snap) => {
+    const targetId = id || auth.currentUser?.uid;
+    if (!targetId) return;
+
+    const unsub = onSnapshot(doc(db, 'users', targetId), (snap) => {
       if (snap.exists()) setPlayers({ id: snap.id, ...snap.data() });
       setLoading(false);
     });
@@ -116,38 +118,36 @@ export default function PlayerProfileScreen() {
           <Text style={styles.meta}>{player.emirate} · {player.skillRating || 0} Rating</Text>
         </View>
 
-        <View style={styles.statsRow}>
-          {isGK ? (
-            <>
-              <View style={styles.statBox}>
-                <MaterialCommunityIcons name="shield-check-outline" size={24} color={Colors.dark.tint} />
-                <Text style={styles.statVal}>{player.totalCleanSheets || 0}</Text>
-                <Text style={styles.statLbl}>Clean Sheets</Text>
-              </View>
-              <View style={styles.statBox}>
-                <MaterialCommunityIcons name="hand-front-right-outline" size={24} color={Colors.dark.tint} />
-                <Text style={styles.statVal}>{player.totalSaves || 0}</Text>
-                <Text style={styles.statLbl}>Saves</Text>
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={styles.statBox}>
-                <Ionicons name="football-outline" size={24} color={Colors.dark.tint} />
-                <Text style={styles.statVal}>{player.goals || 0}</Text>
-                <Text style={styles.statLbl}>Goals</Text>
-              </View>
-              <View style={styles.statBox}>
-                <Ionicons name="flash-outline" size={24} color={Colors.dark.tint} />
-                <Text style={styles.statVal}>{player.assists || 0}</Text>
-                <Text style={styles.statLbl}>Assists</Text>
-              </View>
-            </>
-          )}
+        <View style={styles.statsContainer}>
           <View style={styles.statBox}>
-            <Ionicons name="calendar-outline" size={24} color={Colors.dark.tint} />
+            <Ionicons name="football-outline" size={20} color={Colors.dark.tint} />
+            <Text style={styles.statVal}>{player.goals || 0}</Text>
+            <Text style={styles.statLbl}>Goals</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Ionicons name="flash-outline" size={20} color={Colors.dark.tint} />
+            <Text style={styles.statVal}>{player.assists || 0}</Text>
+            <Text style={styles.statLbl}>Assists</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Ionicons name="trophy-outline" size={20} color={Colors.dark.tint} />
+            <Text style={styles.statVal}>{player.wins || 0}</Text>
+            <Text style={styles.statLbl}>Wins</Text>
+          </View>
+          <View style={styles.statBox}>
+            <MaterialCommunityIcons name="shield-check-outline" size={20} color={Colors.dark.tint} />
+            <Text style={styles.statVal}>{player.totalCleanSheets || 0}</Text>
+            <Text style={styles.statLbl}>Clean Sheets</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Ionicons name="calendar-outline" size={20} color={Colors.dark.tint} />
             <Text style={styles.statVal}>{player.matches || 0}</Text>
             <Text style={styles.statLbl}>Matches</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Ionicons name="star-outline" size={20} color={Colors.dark.tint} />
+            <Text style={styles.statVal}>{player.skillRating || 0}</Text>
+            <Text style={styles.statLbl}>Rating</Text>
           </View>
         </View>
 
@@ -196,10 +196,26 @@ const styles = StyleSheet.create({
   posText: { color: '#000', fontSize: 10, fontWeight: 'bold' },
   name: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
   meta: { color: '#666', fontSize: 14, marginTop: 4 },
-  statsRow: { flexDirection: 'row', gap: 12, marginBottom: 32 },
-  statBox: { flex: 1, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  statVal: { color: '#fff', fontSize: 20, fontWeight: 'bold', marginTop: 8 },
-  statLbl: { color: '#444', fontSize: 10, textTransform: 'uppercase', marginTop: 2 },
+  statsContainer: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    justifyContent: 'space-between', 
+    gap: 12, 
+    marginBottom: 32 
+  },
+  statBox: { 
+    width: '30%', 
+    aspectRatio: 1, 
+    backgroundColor: 'rgba(255,255,255,0.03)', 
+    borderRadius: 20, 
+    padding: 8, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    borderWidth: 1, 
+    borderColor: 'rgba(255,255,255,0.05)' 
+  },
+  statVal: { color: '#fff', fontSize: 18, fontWeight: 'bold', marginTop: 4 },
+  statLbl: { color: '#444', fontSize: 8, textTransform: 'uppercase', marginTop: 2, textAlign: 'center' },
   actions: { gap: 12 },
   msgBtn: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: BorderRadius.md, padding: 18, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   msgBtnText: { color: '#fff', fontWeight: 'bold', fontSize: FontSizes.md },

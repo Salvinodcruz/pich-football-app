@@ -158,12 +158,12 @@ export default function NotificationsScreen() {
 
         {notifications.map(n => {
           const config = getNotifConfig(n.type);
-          const hasActions = n.type === 'join_request' || n.type === 'team_invite' || n.type === 'friend_request';
+          const hasActions = n.type === 'join_request' || n.type === 'team_invite' || n.type === 'friend_request' || n.type === 'challenge_received';
 
           return (
             <View key={n.id} style={[styles.card, !n.read && styles.unreadCard]}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={[styles.iconCircle, { backgroundColor: config.color + '20' }]}>
+                <View style={[styles.iconCircle, { backgroundColor: config.color + '15', borderColor: config.color + '30', borderWidth: 1 }]}>
                   <Ionicons name={config.icon as any} size={18} color={config.color} />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -180,13 +180,21 @@ export default function NotificationsScreen() {
                   <Text style={styles.notifTime}>{getTimeAgo(n.createdAt)}</Text>
                 </View>
                 <TouchableOpacity onPress={() => clearOne(n.id)} style={styles.clearBtn}>
-                  <Ionicons name="close" size={18} color="#444" />
+                  <Ionicons name="close" size={18} color="rgba(255,255,255,0.2)" />
                 </TouchableOpacity>
               </View>
 
               {hasActions && (
                 <View style={styles.notifActions}>
-                   {n.type === 'team_invite' && (
+                   {n.fromUserId && (
+                    <TouchableOpacity 
+                      style={styles.viewBtn}
+                      onPress={() => router.push({ pathname: '/player-profile', params: { id: n.fromUserId } })}
+                    >
+                      <Text style={styles.viewBtnText}>View Profile</Text>
+                    </TouchableOpacity>
+                  )}
+                  {n.type === 'team_invite' && (
                     <TouchableOpacity 
                       style={styles.viewBtn}
                       onPress={() => router.push({ pathname: '/team/[id]', params: { id: n.fromTeamId, preview: 'true' } })}
@@ -213,14 +221,6 @@ export default function NotificationsScreen() {
                     <TouchableOpacity 
                       style={styles.acceptBtn}
                       onPress={() => router.push('/(tabs)/my-team')}
-                    >
-                      <Text style={styles.acceptBtnText}>Review</Text>
-                    </TouchableOpacity>
-                  )}
-                  {n.type === 'friend_request' && (
-                    <TouchableOpacity 
-                      style={styles.acceptBtn}
-                      onPress={() => router.push('/friends')}
                     >
                       <Text style={styles.acceptBtnText}>Review</Text>
                     </TouchableOpacity>

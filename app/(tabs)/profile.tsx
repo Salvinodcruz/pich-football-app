@@ -282,27 +282,37 @@ export default function ProfileScreen() {
 
         {/* ── Hero Section ── */}
         <View style={styles.heroSection}>
-          <TouchableOpacity style={styles.avatarWrapper} onPress={handlePhotoUpload} disabled={uploadingPhoto}>
-            <View style={[styles.avatarGlow, { borderColor: posColor, shadowColor: posColor }]}>
-              {profile?.photoURL ? (
-                <Image source={{ uri: profile.photoURL }} style={styles.avatarImage} />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Text style={[styles.avatarInitials, { color: posColor }]}>{initials.toUpperCase()}</Text>
-                </View>
-              )}
-              {profile?.position && (
-                <View style={[styles.posBadgeOnAvatar, { backgroundColor: posColor }]}>
-                  <Text style={styles.posBadgeText}>{profile.position}</Text>
-                </View>
-              )}
-            </View>
+          <View style={styles.avatarWrapper}>
+            <TouchableOpacity onPress={handlePhotoUpload} disabled={uploadingPhoto}>
+              <View style={[styles.avatarGlow, { borderColor: posColor, shadowColor: posColor }]}>
+                {profile?.photoURL ? (
+                  <Image source={{ uri: profile.photoURL }} style={styles.avatarImage} />
+                ) : (
+                  <View style={styles.avatarPlaceholder}>
+                    <Text style={[styles.avatarInitials, { color: posColor }]}>{initials.toUpperCase()}</Text>
+                  </View>
+                )}
+                {profile?.position && (
+                  <View style={[styles.posBadgeOnAvatar, { backgroundColor: posColor }]}>
+                    <Text style={styles.posBadgeText}>{profile.position}</Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.miniEditBtn} 
+              onPress={() => setShowEditModal(true)}
+            >
+              <Ionicons name="pencil" size={12} color="#000" />
+            </TouchableOpacity>
+
             {uploadingPhoto && (
               <View style={styles.uploadingOverlay}>
                 <ActivityIndicator size="small" color={Colors.dark.tint} />
               </View>
             )}
-          </TouchableOpacity>
+          </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={styles.heroName}>{displayName}</Text>
@@ -369,18 +379,6 @@ export default function ProfileScreen() {
               ))}
             </>
           )}
-        </View>
-
-        {/* ── Action Row ── */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.actionGlass} onPress={() => router.push('/friends')}>
-            <Ionicons name="people-outline" size={18} color="#aaa" />
-            <Text style={styles.actionGlassText}>Friends</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionGlass, styles.actionGlassGreen]} onPress={() => router.push('/free-agents')}>
-            <Ionicons name="walk-outline" size={18} color={Colors.dark.tint} />
-            <Text style={[styles.actionGlassText, { color: Colors.dark.tint }]}>Free Agents</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Admin */}
@@ -540,6 +538,7 @@ const styles = StyleSheet.create({
   avatarImage: { width: '100%', height: '100%', borderRadius: 48, overflow: 'hidden' },
   avatarPlaceholder: { width: '100%', height: '100%', backgroundColor: '#1A1A1A', borderRadius: 48, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   avatarInitials: { fontSize: FontSizes.xl, fontWeight: FontWeights.bold },
+  miniEditBtn: { position: 'absolute', top: 0, right: 0, backgroundColor: Colors.dark.tint, width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#050505' },
   posBadgeOnAvatar: { position: 'absolute', bottom: -5, right: -5, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1.5, borderColor: '#050505' },
   posBadgeText: { color: '#000', fontSize: 9, fontWeight: FontWeights.bold },
   uploadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 48, justifyContent: 'center', alignItems: 'center' },

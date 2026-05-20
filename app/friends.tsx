@@ -157,7 +157,11 @@ export default function FriendsScreen() {
   const renderFriend = (friend: any) => {
     const name = `${friend.firstName || ''} ${friend.lastName || ''}`.trim() || friend.name || 'Player';
     return (
-      <View key={friend.id} style={styles.friendRow}>
+      <TouchableOpacity 
+        key={friend.id} 
+        style={styles.friendRow}
+        onPress={() => router.push({ pathname: '/player-profile', params: { id: friend.id } })}
+      >
         {friend.photoURL ? (
           <Image source={{ uri: friend.photoURL }} style={styles.avatar} />
         ) : (
@@ -180,7 +184,7 @@ export default function FriendsScreen() {
             <Ionicons name="trash-outline" size={18} color="#FF4444" />
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 

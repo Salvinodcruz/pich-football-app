@@ -122,16 +122,47 @@ export default function TeamProfileScreen() {
         </View>
 
         {/* Stats Grid Glass */}
-        <View style={styles.statsRowGlass}>
-          <View style={styles.statBoxGlass}><Text style={styles.statValue}>{team.wins || 0}</Text><Text style={styles.statLabel}>Wins</Text></View>
-          <View style={styles.statBoxGlass}><Text style={styles.statValue}>{team.draws || 0}</Text><Text style={styles.statLabel}>Draws</Text></View>
-          <View style={styles.statBoxGlass}><Text style={styles.statValue}>{team.losses || 0}</Text><Text style={styles.statLabel}>Losses</Text></View>
-          <View style={styles.statBoxGlass}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-              <Ionicons name="star" size={14} color={Colors.dark.tint} />
-              <Text style={styles.statValue}>{team.skillRating?.toFixed(1) || 0}</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Team Stats</Text>
+          <View style={styles.statsRowGlass}>
+            <View style={styles.statBoxGlass}>
+              <Text style={styles.statValue}>{(team.wins || 0) + (team.draws || 0) + (team.losses || 0)}</Text>
+              <Text style={styles.statLabel}>Matches</Text>
             </View>
-            <Text style={styles.statLabel}>Rating</Text>
+            <View style={[styles.statBoxGlass, { borderColor: Colors.dark.tint + '40' }]}>
+              <Text style={[styles.statValue, { color: Colors.dark.tint }]}>{team.wins || 0}</Text>
+              <Text style={styles.statLabel}>Wins</Text>
+            </View>
+            <View style={styles.statBoxGlass}>
+              <Text style={styles.statValue}>{team.draws || 0}</Text>
+              <Text style={styles.statLabel}>Draws</Text>
+            </View>
+            <View style={[styles.statBoxGlass, { borderColor: '#FF444440' }]}>
+              <Text style={[styles.statValue, { color: '#FF4444' }]}>{team.losses || 0}</Text>
+              <Text style={styles.statLabel}>Losses</Text>
+            </View>
+          </View>
+
+          <View style={[styles.statsRowGlass, { marginTop: Spacing.sm }]}>
+            <View style={styles.statBoxGlass}>
+              <Text style={styles.statValue}>{(team as any).totalGoalsScored || 0}</Text>
+              <Text style={styles.statLabel}>Goals Scored</Text>
+            </View>
+            <View style={styles.statBoxGlass}>
+              <Text style={styles.statValue}>{(team as any).totalCleanSheets || 0}</Text>
+              <Text style={styles.statLabel}>Clean Sheets</Text>
+            </View>
+            <View style={styles.statBoxGlass}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                <Ionicons name="star" size={14} color={Colors.dark.tint} />
+                <Text style={styles.statValue}>
+                  {players.length > 0 
+                    ? (players.reduce((acc, p) => acc + (p.skillRating || 0), 0) / players.length).toFixed(1)
+                    : (team.skillRating?.toFixed(1) || '0.0')}
+                </Text>
+              </View>
+              <Text style={styles.statLabel}>Avg Rating</Text>
+            </View>
           </View>
         </View>
 
@@ -175,7 +206,11 @@ export default function TeamProfileScreen() {
               <Text style={styles.emptyText}>No players yet</Text>
             ) : (
               players.map((player, i) => (
-                <View key={player.id} style={[styles.playerRowGlass, i === players.length - 1 && { borderBottomWidth: 0 }]}>
+                <TouchableOpacity 
+                  key={player.id} 
+                  style={[styles.playerRowGlass, i === players.length - 1 && { borderBottomWidth: 0 }]}
+                  onPress={() => router.push({ pathname: '/player-profile', params: { id: player.id } })}
+                >
                   <Text style={styles.playerNumber}>{i + 1}</Text>
                   {player.photoURL ? (
                     <Image source={{ uri: player.photoURL }} style={styles.playerAvatarImg} />
@@ -219,7 +254,7 @@ export default function TeamProfileScreen() {
                       </>
                     )}
                   </View>
-                </View>
+                </TouchableOpacity>
               ))
             )}
           </View>

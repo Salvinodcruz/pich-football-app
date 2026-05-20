@@ -42,8 +42,7 @@ export default function FindScreen() {
   const loadTeams = async () => {
     try {
       const all = await getAllTeams();
-      const filtered = all.filter(t => !t.players?.includes(auth.currentUser?.uid || ''));
-      setTeams(filtered);
+      setTeams(all);
     } catch (e) {
       console.error(e);
     } finally {

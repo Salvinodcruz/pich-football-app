@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/src/config/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { Colors, Spacing, BorderRadius, FontSizes, FontWeights } from '@/constants/theme';
@@ -56,22 +56,49 @@ export default function SignupScreen() {
 
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      router.push({
-        pathname: '/profile-setup',
-        params: {
-          userId: userCredential.user.uid,
-          email: userCredential.user.email,
-          firstName: firstName.trim(),
-          middleName: middleName.trim(),
-          lastName: lastName.trim(),
-        },
-      });
+      let user;
+      
+      // If already signed in with the same email, use that user
+      if (auth.currentUser && auth.currentUser.email === email.trim().toLowerCase()) {
+        user = auth.currentUser;
+      } else {
+        try {
+          const userCredential = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+          user = userCredential.user;
+        } catch (signupError: any) {
+          // If email is already in use, try to sign in with the provided password
+          if (signupError.code === 'auth/email-already-in-use') {
+            try {
+              const signInCredential = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+              user = signInCredential.user;
+            } catch (signInError) {
+              // If sign in also fails, it's probably a wrong password or other issue
+              throw signupError; // Throw the original signup error
+            }
+          } else {
+            throw signupError;
+          }
+        }
+      }
+
+      if (user) {
+        router.push({
+          pathname: '/profile-setup',
+          params: {
+            userId: user.uid,
+            email: user.email || email.trim().toLowerCase(),
+            firstName: firstName.trim(),
+            middleName: middleName.trim(),
+            lastName: lastName.trim(),
+          },
+        });
+      }
     } catch (error: any) {
       let message = 'Failed to create account';
-      if (error.code === 'auth/email-already-in-use') message = 'This email is already registered';
+      if (error.code === 'auth/email-already-in-use') message = 'This email is already registered. Try signing in or use a different email.';
       else if (error.code === 'auth/invalid-email') message = 'Invalid email address';
       else if (error.code === 'auth/weak-password') message = 'Password is too weak';
+      else if (error.code === 'auth/network-request-failed') message = 'Network error. Please check your connection.';
       Alert.alert('Signup Error', message);
     } finally {
       setLoading(false);
