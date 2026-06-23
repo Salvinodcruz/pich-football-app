@@ -6,6 +6,7 @@ import Svg, { Polygon } from 'react-native-svg';
 import {doc, getDoc, collection, query,where, orderBy, limit, updateDoc, onSnapshot, getDocs,} from 'firebase/firestore';
 import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
+import { acceptChallenge, declineChallenge } from '@/src/utils/challengeService';
 import CustomDialog from '@/src/components/CustomDialog';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import HeroMatchCard from '@/src/components/HeroMatchCard';
@@ -265,8 +266,8 @@ export default function HomeScreen() {
     } catch (e) { console.error(e); } finally { setLoading(false); setRefreshing(false); }
   };
 
-  const handleAccept = async (challengeId: string) => { try { await updateDoc(doc(db, 'challenges', challengeId), { status: 'accepted' }); setSelectedChallenge(null); } catch (e) { console.error(e); } };
-  const handleDecline = async (challengeId: string) => { try { await updateDoc(doc(db, 'challenges', challengeId), { status: 'declined' }); setSelectedChallenge(null); } catch (e) { console.error(e); } };
+  const handleAccept = async (challengeId: string) => { try { await acceptChallenge(challengeId); setSelectedChallenge(null); } catch (e) { console.error(e); } };
+  const handleDecline = async (challengeId: string) => { try { await declineChallenge(challengeId); setSelectedChallenge(null); } catch (e) { console.error(e); } };
   const handleCancelMatch = (challenge: any) => { const c = { ...challenge }; setSelectedChallenge(null); setTimeout(() => { setPendingCancel(c); setCancelDialog(true); }, 500); };
   const confirmCancel = async () => {
     const challenge = pendingCancel; const tid = teamIdRef.current; setCancelDialog(false); setPendingCancel(null); setSelectedChallenge(null);

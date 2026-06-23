@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import {View, Text, TextInput, TouchableOpacity,StyleSheet, Alert, ActivityIndicator,ScrollView} from 'react-native';
+import {View, Text, TextInput, TouchableOpacity,StyleSheet, ActivityIndicator,ScrollView} from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/src/config/firebase';
@@ -8,6 +8,7 @@ import { updatePlayerRating } from '@/src/utils/ratingService';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useDialog } from '@/src/context/DialogContext';
 
 const POSITIONS = ['GK', 'DEF', 'MID', 'FWD'];
 const EMIRATES = ['Sharjah', 'Dubai', 'Ajman'];
@@ -20,6 +21,7 @@ const generatePlayerId = () => {
 export default function ProfileSetupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { showAlert } = useDialog();
   const params = useLocalSearchParams();
   const userId = params.userId as string;
   const email = params.email as string;
@@ -37,8 +39,8 @@ export default function ProfileSetupScreen() {
   const fullName = [firstName, middleName, lastName].filter(Boolean).join(' ');
 
   const handleSave = async () => {
-    if (!position) { Alert.alert('Error', 'Please select your position'); return; }
-    if (!emirate) { Alert.alert('Error', 'Please select your emirate'); return; }
+    if (!position) { showAlert('Error', 'Please select your position'); return; }
+    if (!emirate) { showAlert('Error', 'Please select your emirate'); return; }
 
     setLoading(true);
     try {
@@ -70,7 +72,7 @@ export default function ProfileSetupScreen() {
 
       router.replace('/(tabs)');
     } catch (error) {
-      Alert.alert('Error', 'Failed to save profile. Please try again.');
+      showAlert('Error', 'Failed to save profile. Please try again.');
     } finally {
       setLoading(false);
     }

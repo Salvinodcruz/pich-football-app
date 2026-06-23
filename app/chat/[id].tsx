@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform,
+  TouchableOpacity, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,11 +13,13 @@ import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons } from '@expo/vector-icons';
+import { useDialog } from '@/src/context/DialogContext';
 
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { showAlert } = useDialog();
   const { id, opponentName } = useLocalSearchParams<{
     id: string;
     opponentName: string;
@@ -66,7 +68,7 @@ export default function ChatScreen() {
       });
       setText('');
     } catch (e) {
-      Alert.alert('Error', 'Could not send message');
+      showAlert('Error', 'Could not send message');
     } finally {
       setSending(false);
     }
@@ -77,8 +79,8 @@ export default function ChatScreen() {
 return (
   <KeyboardAvoidingView
     style={[styles.container, { backgroundColor: '#050505' }]}
-    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    keyboardVerticalOffset={0}
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
   >
     <PremiumBackground />
       {/* Header */}
@@ -134,23 +136,25 @@ return (
       </ScrollView>
 
       {/* Input */}
-      <View style={[styles.inputRow, { paddingBottom: insets.bottom + Spacing.md }]}>
-        <TextInput
-          style={styles.input}
-          value={text}
-          onChangeText={setText}
-          placeholder="Type a message..."
-          placeholderTextColor={Colors.dark.textSecondary}
-          multiline
-          maxLength={500}
-        />
-        <TouchableOpacity
-          style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]}
-          onPress={sendMessage}
-          disabled={!text.trim() || sending}
-        >
-          <Ionicons name="send" size={20} color="#000" />
-        </TouchableOpacity>
+      <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
+        <View style={styles.inputCapsule}>
+          <TextInput
+            style={styles.input}
+            value={text}
+            onChangeText={setText}
+            placeholder="Type a message..."
+            placeholderTextColor={Colors.dark.textSecondary}
+            multiline
+            maxLength={500}
+          />
+          <TouchableOpacity
+            style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]}
+            onPress={sendMessage}
+            disabled={!text.trim() || sending}
+          >
+            <Ionicons name="send" size={18} color="#000" />
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -176,8 +180,36 @@ const styles = StyleSheet.create({
   myMessageText: { color: '#000' },
   messageTime: { color: Colors.dark.textSecondary, fontSize: 10, alignSelf: 'flex-end' },
   myMessageTime: { color: '#00000080' },
-  inputRow: { flexDirection: 'row', gap: Spacing.sm, padding: Spacing.md, backgroundColor: 'rgba(255,255,255,0.03)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', alignItems: 'flex-end' },
-  input: { flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: Spacing.sm, color: Colors.dark.text, fontSize: FontSizes.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', maxHeight: 100 },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.dark.tint, justifyContent: 'center', alignItems: 'center' },
+  inputContainer: { 
+    padding: Spacing.md, 
+    backgroundColor: 'transparent',
+  },
+  inputCapsule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 30,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  input: { 
+    flex: 1, 
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    color: Colors.dark.text, 
+    fontSize: FontSizes.md, 
+    maxHeight: 120,
+  },
+  sendBtn: { 
+    width: 36, 
+    height: 36, 
+    borderRadius: 18, 
+    backgroundColor: Colors.dark.tint, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    marginLeft: 4,
+  },
   sendBtnDisabled: { opacity: 0.4 },
 });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import {View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator} from 'react-native';
+import {View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { auth, db } from '@/src/config/firebase';
@@ -7,6 +7,7 @@ import { createTeam } from '@/src/utils/teamService';
 import { doc, getDoc } from 'firebase/firestore';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import PremiumBackground from '@/src/components/PremiumBackground';
+import CustomDialog from '@/src/components/CustomDialog';
 import { Ionicons } from '@expo/vector-icons';
 
 const TEAM_COLORS = ['#00E676', '#FF6B6B', '#4FC3F7', '#FFD54F', '#CE93D8', '#FF8A65'];
@@ -24,8 +25,24 @@ export default function CreateTeamScreen() {
   const [emirate, setEmirate] = useState(EMIRATES[0]);
   const [skill, setSkill] = useState(SKILL_LEVELS[1]);
 
+  const [dialog, setDialog] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    buttons: [] as any[],
+  });
+
+  const showCustomAlert = (title: string, message: string, buttons?: any[]) => {
+    setDialog({
+      visible: true,
+      title,
+      message,
+      buttons: buttons || [{ text: 'OK', onPress: () => setDialog(prev => ({ ...prev, visible: false })) }],
+    });
+  };
+
   const handleCreate = async () => {
-    if (!name.trim()) { Alert.alert('Error', 'Please enter a team name'); return; }
+    if (!name.trim()) { showCustomAlert('Error', 'Please enter a team name'); return; }
     setLoading(true);
     try {
       const user = auth.currentUser;
@@ -43,8 +60,8 @@ export default function CreateTeamScreen() {
         captainId: user.uid,
         captainName: captainName,
       }, user.uid);
-      Alert.alert('Success!', 'Your team has been created.', [{ text: 'OK', onPress: () => router.replace('/(tabs)/my-team') }]);
-    } catch (e) { Alert.alert('Error', 'Could not create team'); } finally { setLoading(false); }
+      showCustomAlert('Success!', 'Your team has been created.', [{ text: 'OK', onPress: () => { setDialog(prev => ({ ...prev, visible: false })); router.replace('/(tabs)/my-team'); } }]);
+    } catch (e) { showCustomAlert('Error', 'Could not create team'); } finally { setLoading(false); }
   };
 
   return (
@@ -106,6 +123,14 @@ export default function CreateTeamScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      <CustomDialog
+        visible={dialog.visible}
+        title={dialog.title}
+        message={dialog.message}
+        buttons={dialog.buttons}
+        onClose={() => setDialog(prev => ({ ...prev, visible: false }))}
+      />
     </View>
   );
 }

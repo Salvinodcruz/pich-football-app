@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, TextInput, Alert, ActivityIndicator,
+  TouchableOpacity, TextInput, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,6 +10,7 @@ import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons } from '@expo/vector-icons';
+import { useDialog } from '@/src/context/DialogContext';
 
 const REASONS = [
   { id: 'no-show', label: 'No-show — did not turn up', icon: 'person-remove-outline' },
@@ -21,6 +22,7 @@ const REASONS = [
 export default function ReportTeamScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { showAlert } = useDialog();
   const { teamId, teamName, matchId } = useLocalSearchParams<{
     teamId: string;
     teamName: string;
@@ -33,7 +35,7 @@ export default function ReportTeamScreen() {
 
   const handleSubmit = async () => {
     if (!reason) {
-      Alert.alert('Select Reason', 'Please select a reason for the report');
+      showAlert('Select Reason', 'Please select a reason for the report');
       return;
     }
     setLoading(true);
@@ -56,13 +58,13 @@ export default function ReportTeamScreen() {
         createdAt: new Date().toISOString(),
       });
 
-      Alert.alert(
+      showAlert(
         'Report Submitted!',
         'Our team will review this report. Verified reports will affect the team\'s trust score.',
         [{ text: 'OK', onPress: () => router.back() }]
       );
     } catch (e) {
-      Alert.alert('Error', 'Could not submit report');
+      showAlert('Error', 'Could not submit report');
     } finally {
       setLoading(false);
     }
@@ -193,7 +195,7 @@ const styles = StyleSheet.create({
   reasonTextActive: { color: '#fff' },
   detailsInput: { backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: BorderRadius.md, padding: Spacing.md, color: '#fff', fontSize: FontSizes.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', height: 120, textAlignVertical: 'top', marginBottom: Spacing.lg },
   proofCard: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  proofTitle: { color: '#fff', fontSize: FontSizes.sm, fontWeight: 'bold' },
+  proofTitle: { color: '#fff', fontSize: FontSizes.sm, fontWeight: FontWeights.bold },
   proofText: { color: '#666', fontSize: 12, lineHeight: 18, marginTop: 4 },
   warningCard: { backgroundColor: 'rgba(255,193,7,0.05)', borderRadius: BorderRadius.md, padding: Spacing.md, marginBottom: Spacing.xl, borderWidth: 1, borderColor: 'rgba(255,193,7,0.2)' },
   warningText: { color: '#FFC107', fontSize: 11, lineHeight: 18, flex: 1, fontWeight: 'bold' },

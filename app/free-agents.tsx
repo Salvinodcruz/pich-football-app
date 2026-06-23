@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Alert, RefreshControl,
+  TouchableOpacity, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -12,6 +12,7 @@ import {
 import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import ChevronBackground from '@/src/components/ChevronBackground';
+import CustomDialog from '@/src/components/CustomDialog';
 
 
 const POSITIONS = ['All', 'GK', 'DEF', 'MID', 'FWD'];
@@ -29,6 +30,22 @@ export default function FreeAgentsScreen() {
   const [userTeamName, setUserTeamName] = useState('');
   const [isCaptain, setIsCaptain] = useState(false);
   const [recruiting, setRecruiting] = useState<string | null>(null);
+
+  const [dialog, setDialog] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    buttons: [] as any[],
+  });
+
+  const showCustomAlert = (title: string, message: string, buttons?: any[]) => {
+    setDialog({
+      visible: true,
+      title,
+      message,
+      buttons: buttons || [{ text: 'OK', onPress: () => setDialog(prev => ({ ...prev, visible: false })) }],
+    });
+  };
 
   useEffect(() => { load(); }, []);
 
@@ -72,11 +89,11 @@ export default function FreeAgentsScreen() {
 
   const handleRecruit = async (player: any) => {
     if (!isCaptain) {
-      Alert.alert('Captains Only', 'Only team captains can recruit players');
+      showCustomAlert('Captains Only', 'Only team captains can recruit players');
       return;
     }
     if (!userTeamId) {
-      Alert.alert('No Team', 'You need a team to recruit players');
+      showCustomAlert('No Team', 'You need a team to recruit players');
       return;
     }
 
@@ -84,14 +101,15 @@ export default function FreeAgentsScreen() {
       ? `${player.firstName} ${player.lastName}`
       : player.name || 'Player';
 
-    Alert.alert(
+    showCustomAlert(
       'Send Recruit Request',
       `Send a recruit request to ${playerName} from ${userTeamName}?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => setDialog(prev => ({ ...prev, visible: false })) },
         {
           text: 'Send Request',
           onPress: async () => {
+            setDialog(prev => ({ ...prev, visible: false }));
             setRecruiting(player.id);
             try {
               // Save recruit request to Firestore
@@ -105,12 +123,12 @@ export default function FreeAgentsScreen() {
                 status: 'pending',
                 createdAt: new Date().toISOString(),
               });
-              Alert.alert(
+              showCustomAlert(
                 'Request Sent! ✅',
                 `${playerName} will receive your recruit request in their notifications.`
               );
             } catch (e) {
-              Alert.alert('Error', 'Could not send recruit request');
+              showCustomAlert('Error', 'Could not send recruit request');
             } finally {
               setRecruiting(null);
             }
@@ -260,6 +278,14 @@ export default function FreeAgentsScreen() {
         </View>
       )}
     </ScrollView>
+
+    <CustomDialog
+      visible={dialog.visible}
+      title={dialog.title}
+      message={dialog.message}
+      buttons={dialog.buttons}
+      onClose={() => setDialog(prev => ({ ...prev, visible: false }))}
+    />
     </View>
   );
 }

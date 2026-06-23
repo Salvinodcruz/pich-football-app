@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Alert, Image,
+  TouchableOpacity, ActivityIndicator, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -11,10 +11,12 @@ import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constan
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { invitePlayerToTeam, startConversation } from '@/src/utils/teamService';
+import { useDialog } from '@/src/context/DialogContext';
 
 export default function PlayerProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { showAlert } = useDialog();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [player, setPlayers] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -55,9 +57,9 @@ export default function PlayerProfileScreen() {
     setProcessing(true);
     try {
       await invitePlayerToTeam(userTeam.id, userTeam.name, auth.currentUser!.uid, player.id);
-      Alert.alert('Invite Sent! ✅', `${player.firstName || 'Player'} has been invited.`);
+      showAlert('Invite Sent! ✅', `${player.firstName || 'Player'} has been invited.`);
     } catch (e) {
-      Alert.alert('Error', 'Could not send invite');
+      showAlert('Error', 'Could not send invite');
     } finally {
       setProcessing(false);
     }

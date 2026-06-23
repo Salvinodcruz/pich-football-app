@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator,
+  StyleSheet, ActivityIndicator,
   ScrollView, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -11,17 +11,19 @@ import { auth } from '@/src/config/firebase';
 import { Colors, Spacing, BorderRadius, FontSizes, FontWeights } from '@/constants/theme';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons } from '@expo/vector-icons';
+import { useDialog } from '@/src/context/DialogContext';
 
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { showAlert } = useDialog();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password');
+      showAlert('Error', 'Please enter both email and password');
       return;
     }
     setLoading(true);
@@ -30,11 +32,20 @@ export default function LoginScreen() {
       const user = userCredential.user;
       
       // Check if profile exists
-      const { doc, getDoc } = await import('firebase/firestore');
-      const { db } = await import('@/src/config/firebase');
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      let profileExists = false;
+      try {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const { db } = await import('@/src/config/firebase');
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        profileExists = userDoc.exists();
+      } catch (profileError) {
+        console.error('Error fetching profile during login:', profileError);
+        // Fallback: assume profile exists to let them into the app
+        // They can finish setup later if needed, better than being stuck
+        profileExists = true; 
+      }
       
-      if (userDoc.exists()) {
+      if (profileExists) {
         router.replace('/(tabs)');
       } else {
         router.replace('/signup');
@@ -44,7 +55,7 @@ export default function LoginScreen() {
       if (error.code === 'auth/invalid-credential') message = 'Invalid email or password';
       else if (error.code === 'auth/too-many-requests') message = 'Too many attempts. Try again later';
       else if (error.code === 'auth/invalid-email') message = 'Invalid email address';
-      Alert.alert('Login Error', message);
+      showAlert('Login Error', message);
     } finally {
       setLoading(false);
     }
@@ -105,6 +116,13 @@ export default function LoginScreen() {
                 editable={!loading}
               />
             </View>
+
+            <TouchableOpacity
+              onPress={() => router.push('/forgot-password')}
+              style={{ alignSelf: 'flex-end', marginTop: -Spacing.xs, marginBottom: Spacing.sm }}
+            >
+              <Text style={styles.forgotText}>Forgot Password?</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.loginBtn, loading && styles.btnDisabled]}
@@ -190,6 +208,7 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: Spacing.xl },
   footerText: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm },
   link: { color: Colors.dark.tint, fontSize: FontSizes.sm, fontWeight: FontWeights.semibold },
+  forgotText: { color: Colors.dark.textSecondary, fontSize: FontSizes.xs, fontWeight: FontWeights.medium },
   backBtn: { marginTop: Spacing.lg },
   backText: { color: Colors.dark.textSecondary, fontSize: FontSizes.sm },
 });

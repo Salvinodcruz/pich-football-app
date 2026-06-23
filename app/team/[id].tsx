@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Image} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Image} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getTeam, requestToJoinTeam, startConversation } from '@/src/utils/teamService';
@@ -8,6 +8,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import type { Team } from '@/src/types';
 import PremiumBackground from '@/src/components/PremiumBackground';
+import CustomDialog from '@/src/components/CustomDialog';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 
@@ -20,6 +21,22 @@ export default function TeamProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
   const [hasTeam, setHasTeam] = useState(false);
+
+  const [dialog, setDialog] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    buttons: [] as any[],
+  });
+
+  const showCustomAlert = (title: string, message: string, buttons?: any[]) => {
+    setDialog({
+      visible: true,
+      title,
+      message,
+      buttons: buttons || [{ text: 'OK', onPress: () => setDialog(prev => ({ ...prev, visible: false })) }],
+    });
+  };
 
   const isCaptain = team?.captainId === auth.currentUser?.uid;
   const isMyTeam = team?.players?.includes(auth.currentUser?.uid || '');
@@ -49,7 +66,7 @@ export default function TeamProfileScreen() {
         if (pDoc.exists()) profiles.push({ id: pDoc.id, ...pDoc.data() });
       }
       setPlayers(profiles);
-    } catch (e) { Alert.alert('Error', 'Could not load team'); } finally { setLoading(false); }
+    } catch (e) { showCustomAlert('Error', 'Could not load team'); } finally { setLoading(false); }
   };
 
   const handleJoinRequest = async () => {
@@ -60,9 +77,9 @@ export default function TeamProfileScreen() {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const userName = `${userDoc.data()?.firstName || ''} ${userDoc.data()?.lastName || ''}`.trim() || 'Player';
       await requestToJoinTeam(team.id, user.uid, userName);
-      Alert.alert('✅ Request Sent!', 'The captain has been notified.');
+      showCustomAlert('✅ Request Sent!', 'The captain has been notified.');
     } catch (e: any) {
-      Alert.alert('Info', e.message || 'Could not send request');
+      showCustomAlert('Info', e.message || 'Could not send request');
     } finally { setRequesting(false); }
   };
 
@@ -276,6 +293,14 @@ export default function TeamProfileScreen() {
           </View>
         </TouchableOpacity>
       </ScrollView>
+
+      <CustomDialog
+        visible={dialog.visible}
+        title={dialog.title}
+        message={dialog.message}
+        buttons={dialog.buttons}
+        onClose={() => setDialog(prev => ({ ...prev, visible: false }))}
+      />
     </View>
   );
 }

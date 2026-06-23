@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Alert, TextInput,
+  TouchableOpacity, ActivityIndicator, TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -11,11 +11,13 @@ import { subscribeToTournament, joinTournament, leaveTournament, updateTournamen
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons } from '@expo/vector-icons';
+import { useDialog } from '@/src/context/DialogContext';
 
 export default function TournamentDetailsScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { showAlert } = useDialog();
   const [tournament, setTournament] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -42,7 +44,7 @@ export default function TournamentDetailsScreen() {
           });
         }
       } catch (e) {
-        Alert.alert('Error', 'Could not load tournament');
+        showAlert('Error', 'Could not load tournament');
         setLoading(false);
       }
     };
@@ -53,19 +55,19 @@ export default function TournamentDetailsScreen() {
 
   const handleJoin = async () => {
     if (!userTeamId) {
-      Alert.alert('No Team', 'You need a team to join a tournament');
+      showAlert('No Team', 'You need a team to join a tournament');
       return;
     }
     if (tournament.teams?.length >= tournament.maxTeams) {
-      Alert.alert('Full', 'This tournament is full');
+      showAlert('Full', 'This tournament is full');
       return;
     }
     setProcessing(true);
     try {
       await joinTournament(id, userTeamId);
-      Alert.alert('Joined! 🏆', 'Your team has been added to the tournament');
+      showAlert('Joined! 🏆', 'Your team has been added to the tournament');
     } catch (e) {
-      Alert.alert('Error', 'Could not join tournament');
+      showAlert('Error', 'Could not join tournament');
     } finally {
       setProcessing(false);
     }
@@ -74,7 +76,7 @@ export default function TournamentDetailsScreen() {
   const handleLeave = async () => {
     if (!userTeamId || !id) return;
     
-    Alert.alert(
+    showAlert(
       'Leave Tournament',
       'Are you sure you want to withdraw your team from this tournament?',
       [
@@ -86,9 +88,9 @@ export default function TournamentDetailsScreen() {
             setProcessing(true);
             try {
               await leaveTournament(id, userTeamId);
-              Alert.alert('Withdrawn', 'Your team has left the tournament');
+              showAlert('Withdrawn', 'Your team has left the tournament');
             } catch (e) {
-              Alert.alert('Error', 'Could not leave tournament');
+              showAlert('Error', 'Could not leave tournament');
             } finally {
               setProcessing(false);
             }
@@ -103,7 +105,7 @@ export default function TournamentDetailsScreen() {
       await updateTournamentDescription(id, tempDesc);
       setEditingDesc(false);
     } catch (e) {
-      Alert.alert('Error', 'Could not update description');
+      showAlert('Error', 'Could not update description');
     }
   };
 

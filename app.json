@@ -9,9 +9,18 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.salvino.pich",
+      "supportsTablet": true,
+      "buildNumber": "1",
+      "privacyPolicyUrl": "https://www.pich.ae/privacy",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Pich uses your location to show nearby football venues and matches."
+      }
     },
     "android": {
+      "package": "com.salvino.pich",
+      "versionCode": 1,
+      "privacyPolicyUrl": "https://www.pich.ae/privacy",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -35,7 +44,9 @@
           "resizeMode": "contain",
           "backgroundColor": "#0D0D0D"
         }
-      ]
+      ],
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

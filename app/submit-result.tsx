@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Image, Alert,
+  TouchableOpacity, ActivityIndicator, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -13,10 +13,12 @@ import { submitMatchResult } from '@/src/utils/matchService';
 import CustomDialog from '@/src/components/CustomDialog';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useDialog } from '@/src/context/DialogContext';
 
 export default function SubmitResultScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { showAlert } = useDialog();
   const { challengeId, homeTeam, awayTeam, isHome } = useLocalSearchParams<{
     challengeId: string;
     homeTeam: string;
@@ -93,7 +95,7 @@ export default function SubmitResultScreen() {
 
 const handleSubmit = async () => {
   if (totalGoalsAssigned > myCurrentScore) {
-    Alert.alert('Error', 'Assigned goals exceed total score');
+    showAlert('Error', 'Assigned goals exceed total score');
     return;
   }
 
@@ -122,7 +124,9 @@ const handleSubmit = async () => {
       );
 
       if (result.status === 'confirmed') {
-        await recalculateAllRatings();
+        const otherStats = matchData?.homeScoreSubmittedPlayerStats || matchData?.awayScoreSubmittedPlayerStats || [];
+        const allPlayerIds = [...new Set([...playerStatsSubmission, ...otherStats].map(s => s.playerId))];
+        await recalculateAllRatings(allPlayerIds);
         showResult(
           'Result Confirmed!',
           `${homeTeam} ${homeScore} - ${awayScore} ${awayTeam}\n\nPlayer stats have been updated!`,

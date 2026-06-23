@@ -73,7 +73,11 @@ export default function DirectChatScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: '#050505' }}>
       <PremiumBackground />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
         <View style={[styles.header, { paddingTop: insets.top + Spacing.sm }]}>
           <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
             <Ionicons name="chevron-back" size={24} color={Colors.dark.tint} />
@@ -133,23 +137,25 @@ export default function DirectChatScreen() {
           </ScrollView>
         )}
 
-        <View style={[styles.inputRow, { paddingBottom: insets.bottom + Spacing.md }]}>
-          <TextInput
-            style={styles.input}
-            value={text}
-            onChangeText={setText}
-            placeholder="Message..."
-            placeholderTextColor="#555"
-            multiline
-            maxLength={500}
-          />
-          <TouchableOpacity
-            style={[styles.sendBtn, (!text.trim() || sending) && { opacity: 0.4 }]}
-            onPress={sendMessage}
-            disabled={!text.trim() || sending}
-          >
-            <Ionicons name="send" size={20} color="#000" />
-          </TouchableOpacity>
+        <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, Spacing.md) }]}>
+          <View style={styles.inputCapsule}>
+            <TextInput
+              style={styles.input}
+              value={text}
+              onChangeText={setText}
+              placeholder="Message..."
+              placeholderTextColor="#555"
+              multiline
+              maxLength={500}
+            />
+            <TouchableOpacity
+              style={[styles.sendBtn, (!text.trim() || sending) && { opacity: 0.4 }]}
+              onPress={sendMessage}
+              disabled={!text.trim() || sending}
+            >
+              <Ionicons name="send" size={18} color="#000" />
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -180,7 +186,35 @@ const styles = StyleSheet.create({
   myMsgText: { color: '#000' },
   msgTime: { color: '#666', fontSize: 8, alignSelf: 'flex-end' },
   myMsgTime: { color: 'rgba(0,0,0,0.5)' },
-  inputRow: { flexDirection: 'row', gap: Spacing.sm, padding: Spacing.md, backgroundColor: 'rgba(255,255,255,0.03)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', alignItems: 'flex-end' },
-  input: { flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 20, padding: Spacing.sm, color: '#fff', fontSize: FontSizes.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', maxHeight: 100 },
-  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.dark.tint, justifyContent: 'center', alignItems: 'center' },
+  inputContainer: { 
+    padding: Spacing.md, 
+    backgroundColor: 'transparent',
+  },
+  inputCapsule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 30,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  input: { 
+    flex: 1, 
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    color: '#fff', 
+    fontSize: FontSizes.md, 
+    maxHeight: 120,
+  },
+  sendBtn: { 
+    width: 36, 
+    height: 36, 
+    borderRadius: 18, 
+    backgroundColor: Colors.dark.tint, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    marginLeft: 4,
+  },
 });

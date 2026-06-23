@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Alert, ActivityIndicator, Modal,
+  TouchableOpacity, ActivityIndicator, Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,6 +10,7 @@ import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons } from '@expo/vector-icons';
+import { useDialog } from '@/src/context/DialogContext';
 
 const VENUES_BY_EMIRATE: Record<string, string[]> = {
   Sharjah: ['Falcon Sports - Al Majaz, SHJ', 'Al Wahda Sports Club, SHJ', 'Sharjah Club Ground, SHJ', 'Sharjah Stadium Area, SHJ'],
@@ -42,6 +43,7 @@ const ScrollPicker = ({ items, selected, onSelect }: any) => (
 export default function EditMatchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { showAlert } = useDialog();
   const { challengeId, currentDate, currentTime, currentVenue } = useLocalSearchParams<{
     challengeId: string;
     currentDate: string;
@@ -70,7 +72,7 @@ export default function EditMatchScreen() {
   const timeString = `${hour}:${minute} ${period}`;
 
   const handleSave = async () => {
-    if (!venue.trim()) { Alert.alert('Missing Info', 'Please select a venue'); return; }
+    if (!venue.trim()) { showAlert('Missing Info', 'Please select a venue'); return; }
     setLoading(true);
     try {
       const user = auth.currentUser;
@@ -114,12 +116,12 @@ export default function EditMatchScreen() {
         });
       }
 
-      Alert.alert('Match Updated!', 'The other captain has been notified.', [
+      showAlert('Match Updated!', 'The other captain has been notified.', [
         { text: 'OK', onPress: () => router.back() }
       ]);
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Could not update match details');
+      showAlert('Error', 'Could not update match details');
     } finally {
       setLoading(false);
     }

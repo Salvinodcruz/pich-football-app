@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Alert, Linking,
+  TouchableOpacity, ActivityIndicator, Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { doc, onSnapshot, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
+import { acceptChallenge, declineChallenge } from '@/src/utils/challengeService';
 import { parseMatchDateTime, requestCancelMatch } from '@/src/utils/matchService';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useDialog } from '@/src/context/DialogContext';
 
 export default function MatchDetailsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { showAlert } = useDialog();
   const { matchId, teamId: paramTeamId } = useLocalSearchParams<{ matchId: string; teamId: string }>();
   const [match, setMatch] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -49,20 +52,20 @@ export default function MatchDetailsScreen() {
 
   const handleAccept = async () => {
     try {
-      await updateDoc(doc(db, 'challenges', matchId), { status: 'accepted' });
+      await acceptChallenge(matchId);
     } catch (e) { console.error(e); }
   };
 
   const handleDecline = async () => {
     try {
-      await updateDoc(doc(db, 'challenges', matchId), { status: 'declined' });
+      await declineChallenge(matchId);
       router.back();
     } catch (e) { console.error(e); }
   };
 
   const handleCancel = async () => {
     if (!userTeamId || !match) return;
-    Alert.alert(
+    showAlert(
       'Cancel Match',
       'Are you sure you want to cancel this match?',
       [
@@ -75,9 +78,9 @@ export default function MatchDetailsScreen() {
               const teamDoc = await getDoc(doc(db, 'teams', userTeamId));
               const tName = teamDoc.data()?.name || 'Your team';
               await requestCancelMatch(match.id, userTeamId, tName);
-              Alert.alert('Success', 'Cancellation processed');
+              showAlert('Success', 'Cancellation processed');
             } catch (e) {
-              Alert.alert('Error', 'Could not cancel match');
+              showAlert('Error', 'Could not cancel match');
             }
           }
         }
@@ -229,7 +232,7 @@ export default function MatchDetailsScreen() {
           {match.status === 'pending' && match.fromTeamId === userTeamId && (
             <TouchableOpacity 
               style={styles.submitRequestBtn} 
-              onPress={() => Alert.alert('Request Sent', 'Your match request is active')}
+              onPress={() => showAlert('Request Sent', 'Your match request is active')}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Ionicons name="paper-plane-outline" size={18} color={Colors.dark.tint} />

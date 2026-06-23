@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {View, Text, StyleSheet, ScrollView,TouchableOpacity, Alert, ActivityIndicator,TextInput, RefreshControl, Modal, KeyboardAvoidingView, Platform, Image} from 'react-native';
+import {View, Text, StyleSheet, ScrollView,TouchableOpacity, ActivityIndicator,TextInput, RefreshControl, Modal, KeyboardAvoidingView, Platform, Image} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {doc, getDoc, updateDoc, arrayRemove, collection,query, where, getDocs, addDoc, onSnapshot, orderBy,} from 'firebase/firestore';
@@ -10,13 +10,14 @@ import * as ImagePicker from 'expo-image-picker';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { startConversation } from '@/src/utils/teamService';
+import CustomDialog from '@/src/components/CustomDialog';
 
 const TEAM_COLORS = ['#00E676', '#FF6B6B', '#4FC3F7', '#FFD54F', '#CE93D8', '#FF8A65'];
 const FORMATS = ['5-a-side', '7-a-side', '11-a-side'];
 const EMIRATES = ['Sharjah', 'Dubai', 'Ajman'];
 const SKILL_LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
 
-function SwitchToPickupBanner({ onSwitch }: { onSwitch: () => void }) {
+function SwitchToPickupBanner({ onSwitch, showAlert }: { onSwitch: () => void, showAlert: (t: string, m: string) => void }) {
   const [pickupTeam, setPickupTeam] = useState<any>(null);
 
   useEffect(() => {
@@ -38,7 +39,7 @@ function SwitchToPickupBanner({ onSwitch }: { onSwitch: () => void }) {
     <TouchableOpacity style={styles.switchBanner} onPress={async () => {
         const user = auth.currentUser; if (!user) return;
         await updateDoc(doc(db, 'users', user.uid), { teamId: pickupTeam.id });
-        onSwitch(); Alert.alert('Switched!', `Now viewing ${pickupTeam.name}`);
+        onSwitch(); showAlert('Switched!', `Now viewing ${pickupTeam.name}`);
       }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Ionicons name="flash" size={14} color="#4FC3F7" />
@@ -83,6 +84,23 @@ export default function MyTeamScreen() {
   const [editSkill, setEditSkill] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  // Custom Dialog State
+  const [dialogVisible, setDialogVisible] = useState(false);
+  const [dialogConfig, setDialogConfig] = useState<any>({ title: '', message: '', buttons: [] });
+
+  // Player Actions State
+  const [showPlayerActions, setShowPlayerActions] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
+
+  const showCustomAlert = (title: string, message: string, buttons?: any[]) => {
+    setDialogConfig({
+      title,
+      message,
+      buttons: buttons || [{ text: 'OK', onPress: () => setDialogVisible(false) }]
+    });
+    setDialogVisible(true);
+  };
 
   useEffect(() => { load(); }, []);
 
@@ -162,9 +180,9 @@ export default function MyTeamScreen() {
     try {
       const { invitePlayerToTeam } = await import('@/src/utils/teamService');
       await invitePlayerToTeam(team.id, team.name, auth.currentUser!.uid, player.id);
-      Alert.alert('Invite Sent! ✅', `${player.firstName || 'Player'} has been invited.`);
+      showCustomAlert('Invite Sent! ✅', `${player.firstName || 'Player'} has been invited.`);
     } catch (e) {
-      Alert.alert('Error', 'Could not send invite');
+      showCustomAlert('Error', 'Could not send invite');
     }
   };
 
@@ -172,10 +190,10 @@ export default function MyTeamScreen() {
     try {
       const { respondToJoinRequest } = await import('@/src/utils/teamService');
       await respondToJoinRequest(requestId, approve);
-      if (approve) Alert.alert('Success! ✅', 'Player has been added to your team.');
+      if (approve) showCustomAlert('Success! ✅', 'Player has been added to your team.');
       setJoinRequests(prev => prev.filter(r => r.id !== requestId));
       load();
-    } catch (e) { Alert.alert('Error responding to request'); }
+    } catch (e) { showCustomAlert('Error', 'Error responding to request'); }
   };
 
   const handleLogoUpload = async () => {
@@ -188,7 +206,7 @@ export default function MyTeamScreen() {
       const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
       await updateDoc(doc(db, 'teams', team!.id), { logoURL: base64Image });
       await load();
-    } catch (e) { Alert.alert('Error', 'Could not upload logo'); } finally { setUploadingLogo(false); }
+    } catch (e) { showCustomAlert('Error', 'Could not upload logo'); } finally { setUploadingLogo(false); }
   };
 
   const handleSaveTeam = async () => {
@@ -197,7 +215,7 @@ export default function MyTeamScreen() {
     try {
       await updateDoc(doc(db, 'teams', team.id), { name: editName.trim(), color: editColor, formats: editFormats, format: editFormats[0], emirate: editEmirate, skillLevel: editSkill });
       setShowEditTeam(false); load();
-    } catch (e) { Alert.alert('Error', 'Save failed'); } finally { setSaving(false); }
+    } catch (e) { showCustomAlert('Error', 'Save failed'); } finally { setSaving(false); }
   };
 
   const searchPlayer = async () => {
@@ -206,9 +224,9 @@ export default function MyTeamScreen() {
     try {
       const q = query(collection(db, 'users'), where('playerId', '==', searchId.trim().toUpperCase()));
       const snap = await getDocs(q);
-      if (snap.empty) Alert.alert('Not Found');
+      if (snap.empty) showCustomAlert('Not Found', 'No player found with this ID');
       else setSearchResult({ id: snap.docs[0].id, ...snap.docs[0].data() });
-    } catch (e) { Alert.alert('Error', 'Search failed'); } finally { setSearching(false); }
+    } catch (e) { showCustomAlert('Error', 'Search failed'); } finally { setSearching(false); }
   };
 
   const addPlayer = async () => {
@@ -217,40 +235,46 @@ export default function MyTeamScreen() {
       await updateDoc(doc(db, 'teams', team.id), { players: [...(team.players || []), searchResult.id] });
       await updateDoc(doc(db, 'users', searchResult.id), { teamId: team.id, isFreeAgent: false });
       setShowAddPlayer(false); load();
-    } catch (e) { Alert.alert('Error', 'Could not add player'); }
+    } catch (e) { showCustomAlert('Error', 'Could not add player'); }
   };
 
   const removePlayer = async (playerId: string, playerName: string) => {
     if (!team) return;
-    Alert.alert('Remove Player', `Remove ${playerName}?`, [
-      { text: 'Cancel', style: 'cancel' },
+    showCustomAlert('Remove Player', `Are you sure you want to remove ${playerName}?`, [
+      { text: 'Cancel', style: 'cancel', onPress: () => setDialogVisible(false) },
       { text: 'Remove', style: 'destructive', onPress: async () => {
+        setDialogVisible(false);
         try {
           const { doc, updateDoc, arrayRemove } = await import('firebase/firestore');
           await updateDoc(doc(db, 'teams', team.id), { players: arrayRemove(playerId) });
           await updateDoc(doc(db, 'users', playerId), { teamId: null, isFreeAgent: true });
           load();
-        } catch (e) { Alert.alert('Error'); }
+        } catch (e) { showCustomAlert('Error', 'Failed to remove player'); }
       }}
     ]);
   };
 
   const transferCaptaincy = async (newCaptainId: string, newCaptainName: string) => {
     if (!team) return;
-    Alert.alert('Transfer Captaincy', `Make ${newCaptainName} captain?`, [
-      { text: 'Cancel', style: 'cancel' },
+    showCustomAlert('Transfer Captaincy', `Make ${newCaptainName} captain? This cannot be undone easily.`, [
+      { text: 'Cancel', style: 'cancel', onPress: () => setDialogVisible(false) },
       { text: 'Transfer', onPress: async () => {
+        setDialogVisible(false);
         try {
           await updateDoc(doc(db, 'teams', team.id), { captainId: newCaptainId, captainName: newCaptainName });
           load();
-        } catch (e) { Alert.alert('Error'); }
+        } catch (e) { showCustomAlert('Error', 'Failed to transfer captaincy'); }
       }}
     ]);
   };
 
   const changePlayerPosition = async (playerId: string, newPosition: string) => {
-    try { await updateDoc(doc(db, 'users', playerId), { teamPosition: newPosition }); load(); }
-    catch (e) { Alert.alert('Error'); }
+    try { 
+      await updateDoc(doc(db, 'users', playerId), { teamPosition: newPosition }); 
+      load(); 
+      setShowPlayerActions(false);
+    }
+    catch (e) { showCustomAlert('Error', 'Failed to update position'); }
   };
 
   const getPositionColor = (pos: string) => {
@@ -359,7 +383,7 @@ export default function MyTeamScreen() {
           )}
         </View>
 
-        {!(team as any).isPickup && <SwitchToPickupBanner onSwitch={load} />}
+        {!(team as any).isPickup && <SwitchToPickupBanner onSwitch={load} showAlert={showCustomAlert} />}
 
         {/* Join Requests */}
         {isCaptain && joinRequests.length > 0 && (
@@ -524,18 +548,8 @@ export default function MyTeamScreen() {
                     style={{ padding: 4 }} 
                     onPress={(e) => {
                       e.stopPropagation();
-                      Alert.alert(player.firstName, 'Action', [
-                        { text: '👑 Captain', onPress: () => transferCaptaincy(player.id, player.firstName) },
-                        { text: '📍 Position', onPress: () => Alert.alert('Position', 'Select', [
-                          { text: 'GK', onPress: () => changePlayerPosition(player.id, 'GK') },
-                          { text: 'DEF', onPress: () => changePlayerPosition(player.id, 'DEF') },
-                          { text: 'MID', onPress: () => changePlayerPosition(player.id, 'MID') },
-                          { text: 'FWD', onPress: () => changePlayerPosition(player.id, 'FWD') },
-                          { text: 'Cancel', style: 'cancel' }
-                        ])},
-                        { text: '🗑 Remove', style: 'destructive', onPress: () => removePlayer(player.id, player.firstName) },
-                        { text: 'Cancel', style: 'cancel' }
-                      ]);
+                      setSelectedPlayer(player);
+                      setShowPlayerActions(true);
                     }}
                   >
                     <Ionicons name="ellipsis-horizontal" size={16} color="#666" />
@@ -620,6 +634,77 @@ export default function MyTeamScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Player Actions Modal */}
+      <Modal 
+        visible={showPlayerActions} 
+        transparent 
+        animationType="fade" 
+        onRequestClose={() => setShowPlayerActions(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalBackdrop} 
+          activeOpacity={1} 
+          onPress={() => setShowPlayerActions(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={{ width: '100%' }}>
+            <View style={styles.actionsBox}>
+              <View style={styles.actionsHeader}>
+                <Text style={styles.actionsTitle}>{selectedPlayer?.firstName}&apos;s Actions</Text>
+                <TouchableOpacity onPress={() => setShowPlayerActions(false)}>
+                  <Ionicons name="close" size={20} color="#666" />
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity 
+                style={styles.actionItem} 
+                onPress={() => { setShowPlayerActions(false); transferCaptaincy(selectedPlayer.id, selectedPlayer.firstName); }}
+              >
+                <Ionicons name="ribbon-outline" size={20} color={Colors.dark.tint} />
+                <Text style={styles.actionItemText}>Make Captain</Text>
+              </TouchableOpacity>
+
+              <View style={styles.positionSelector}>
+                <Text style={styles.positionLabel}>Set Position:</Text>
+                <View style={styles.posRow}>
+                  {['GK', 'DEF', 'MID', 'FWD'].map(pos => (
+                    <TouchableOpacity 
+                      key={pos} 
+                      style={[styles.posBtn, selectedPlayer?.teamPosition === pos && styles.posBtnActive]} 
+                      onPress={() => changePlayerPosition(selectedPlayer.id, pos)}
+                    >
+                      <Text style={[styles.posBtnText, selectedPlayer?.teamPosition === pos && styles.posBtnTextActive]}>{pos}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <TouchableOpacity 
+                style={[styles.actionItem, styles.destructiveAction]} 
+                onPress={() => { setShowPlayerActions(false); removePlayer(selectedPlayer.id, selectedPlayer.firstName); }}
+              >
+                <Ionicons name="trash-outline" size={20} color="#FF4444" />
+                <Text style={[styles.actionItemText, { color: '#FF4444' }]}>Remove from Team</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.closeBtn} 
+                onPress={() => setShowPlayerActions(false)}
+              >
+                <Text style={styles.closeBtnText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      <CustomDialog 
+        visible={dialogVisible}
+        title={dialogConfig.title}
+        message={dialogConfig.message}
+        buttons={dialogConfig.buttons}
+        onClose={() => setDialogVisible(false)}
+      />
     </View>
   );
 }
@@ -668,9 +753,6 @@ const styles = StyleSheet.create({
   modalWrapper: { flex: 1, backgroundColor: '#050505' }, modalContent: { padding: 20 }, modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }, modalTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' }, modalClose: { color: '#666' },
   inputLabel: { color: '#666', fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, marginTop: 16 }, input: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 12, color: '#fff', fontSize: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   saveBtn: { backgroundColor: Colors.dark.tint, borderRadius: 8, padding: 16, alignItems: 'center', marginTop: 32 }, saveBtnText: { fontWeight: 'bold', color: '#000' },
-  chatHeader: { backgroundColor: 'rgba(255,255,255,0.03)', flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
-  msgBubble: { maxWidth: '80%', padding: 12, borderRadius: 12, marginBottom: 8 }, myBubble: { alignSelf: 'flex-end', backgroundColor: Colors.dark.tint }, theirBubble: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  chatInputRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, backgroundColor: 'rgba(255,255,255,0.03)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }, chatInput: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 8, padding: 12, color: '#fff', maxHeight: 100 },
   colorRow: { flexDirection: 'row', gap: 12, marginBottom: 8 }, colorDot: { width: 32, height: 32, borderRadius: 16 },
   addPlayerSectionGlass: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 20, padding: 16, marginBottom: 24, borderWidth: 1, borderColor: 'rgba(0,230,118,0.2)' },
   searchRow: { flexDirection: 'row', gap: 12 }, searchInput: { flex: 1, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 12, color: '#fff' },
@@ -693,4 +775,20 @@ const styles = StyleSheet.create({
   recruitActionBtn: { backgroundColor: Colors.dark.tint, borderRadius: 8, padding: 10, alignItems: 'center' },
   recruitActionBtnText: { color: '#000', fontWeight: 'bold', fontSize: 12 },
   emptyText: { color: 'rgba(255,255,255,0.3)', fontSize: 14, textAlign: 'center', marginTop: 20 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  actionsBox: { backgroundColor: Colors.dark.card, borderRadius: 24, width: '100%', padding: 24, borderWidth: 1, borderColor: Colors.dark.border, gap: 16 },
+  actionsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  actionsTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  actionItem: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.03)', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  actionItemText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  destructiveAction: { borderColor: 'rgba(255,68,68,0.2)', backgroundColor: 'rgba(255,68,68,0.05)' },
+  positionSelector: { gap: 12, marginTop: 8 },
+  positionLabel: { color: '#666', fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase' },
+  posRow: { flexDirection: 'row', gap: 8 },
+  posBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  posBtnActive: { backgroundColor: Colors.dark.tint + '20', borderColor: Colors.dark.tint },
+  posBtnText: { color: '#666', fontWeight: 'bold', fontSize: 12 },
+  posBtnTextActive: { color: Colors.dark.tint },
+  closeBtn: { marginTop: 8, padding: 16, alignItems: 'center', borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)' },
+  closeBtnText: { color: '#fff', fontWeight: 'bold' },
 });

@@ -11,8 +11,13 @@ const sendNotification = async (toUserId: string, data: any) => {
   });
 };
 
-export const parseMatchDateTime = (dateStr: string, timeStr: string): Date | null => {
+export const parseMatchDateTime = (dateStr: string, timeStr: string, isoDate?: string): Date | null => {
   try {
+    if (isoDate) {
+      const d = new Date(isoDate);
+      if (!isNaN(d.getTime())) return d;
+    }
+
     const MONTHS: Record<string, number> = {
       jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
       jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
@@ -40,7 +45,7 @@ export const parseMatchDateTime = (dateStr: string, timeStr: string): Date | nul
       return new Date(year, month, day, hours, minutes, 0);
     }
   } catch (e) {
-    console.log('Date parse failed:', e);
+    // Date parse failed
   }
   return null;
 };
@@ -54,7 +59,7 @@ export const requestCancelMatch = async (
   if (!challengeDoc.exists()) throw new Error('Match not found');
   const data = challengeDoc.data();
 
-  const matchDate = parseMatchDateTime(data.date, data.time);
+  const matchDate = parseMatchDateTime(data.date, data.time, data.isoDate);
   let hoursUntilMatch = 999;
   if (matchDate) {
     hoursUntilMatch = (matchDate.getTime() - Date.now()) / (1000 * 60 * 60);
@@ -168,7 +173,7 @@ export const checkScoreDeadline = async (challengeId: string): Promise<void> => 
   if (data.status !== 'accepted') return;
 
   try {
-    const matchDate = parseMatchDateTime(data.date, data.time);
+    const matchDate = parseMatchDateTime(data.date, data.time, data.isoDate);
     if (!matchDate) return;
 
     const hoursSinceMatch = (Date.now() - matchDate.getTime()) / (1000 * 60 * 60);
@@ -207,7 +212,7 @@ export const sendScoreReminders = async (teamId: string): Promise<void> => {
 
       // Parse match time
       try {
-        const matchDate = parseMatchDateTime(data.date, data.time);
+        const matchDate = parseMatchDateTime(data.date, data.time, data.isoDate);
         if (!matchDate) continue;
         
         // If match ended > 1 hour ago
@@ -319,7 +324,7 @@ export const submitMatchResult = async (
           // Increment match count only for players who participated
           const myStats = playerStats;
           const otherStats = data[`${otherField}PlayerStats`] || [];
-          
+
           for (const s of [...myStats, ...otherStats]) {
             const userRef = doc(db, 'users', s.playerId);
             const userSnap = await transaction.get(userRef);
@@ -327,35 +332,23 @@ export const submitMatchResult = async (
               const updates: any = { matches: increment(1) };
               if (s.goals > 0) updates.goals = increment(s.goals);
               if (s.assists > 0) updates.assists = increment(s.assists);
-              
+
               // Identify GK for clean sheet logic
               const isGK = s.isGK || userSnap.data().position === 'GK' || userSnap.data().teamPosition === 'GK';
               if (isGK) {
                 if (s.saves > 0) updates.totalSaves = increment(s.saves);
-                
+
                 // Check if opposing team score was 0
                 const playerTeamId = myStats.find(p => p.playerId === s.playerId) ? myTeamId : (myTeamId === data.fromTeamId ? data.toTeamId : data.fromTeamId);
                 const isHomePlayer = playerTeamId === data.fromTeamId;
                 const opposingScore = isHomePlayer ? score.away : score.home;
-                
+
                 if (opposingScore === 0) {
                   updates.totalCleanSheets = increment(1);
-                  // Individual performance rating increase (will be recalculated by updatePlayerRating)
                 }
               }
               transaction.update(userRef, updates);
             }
-          }
-
-          // Recalculate ratings after updates
-          const allPlayerIds = [...new Set([...myStats, ...otherStats].map(s => s.playerId))];
-          const { updatePlayerRating } = await import('@/src/utils/ratingService');
-          for (const pid of allPlayerIds) {
-            // Note: In a real transaction we can't easily call external async functions that read Firestore
-            // because of potential deadlocks or inconsistency if they are not part of the transaction.
-            // However, since updatePlayerRating reads the userDoc, we should do it outside or handle it.
-            // For now, I'll assume we can update it.
-            // Actually, better to calculate rating inside transaction if possible, or trigger it after.
           }
         }
 

@@ -1,0 +1,116 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getTeam(teamId) {
+      return get(/databases/$(database)/documents/teams/$(teamId)).data;
+    }
+
+    function isTeamCaptain(teamId) {
+      return isAuthenticated() && getTeam(teamId).captainId == request.auth.uid;
+    }
+
+    function isPlayerInTeam(teamId) {
+      return isAuthenticated() && request.auth.uid in getTeam(teamId).players;
+    }
+
+    // --- Users ---
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if false; // Profiles shouldn't be deleted easily
+    }
+
+    // --- Teams ---
+    match /teams/{teamId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated(); // Anyone can create a team
+      allow update: if isTeamCaptain(teamId);
+      allow delete: if isTeamCaptain(teamId);
+    }
+
+    // --- Challenges (Matches) ---
+    match /challenges/{challengeId} {
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated() && (
+        isTeamCaptain(request.resource.data.fromTeamId) || 
+        isTeamCaptain(request.resource.data.toTeamId)
+      );
+
+      allow update: if isAuthenticated() && (
+        (isTeamCaptain(resource.data.fromTeamId) || isTeamCaptain(resource.data.toTeamId)) &&
+        // Ensure they only update allowed fields
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'acceptedAt', 'cancelledAt', 'cancelledBy', 'cancelRequest',
+          'homeScoreSubmitted', 'homeScoreSubmittedPlayerStats',
+          'awayScoreSubmitted', 'awayScoreSubmittedPlayerStats',
+          'finalScore', 'completedAt', 'resultExpiresAt', 'scoredBy'
+        ])
+      );
+      
+      allow delete: if isAuthenticated() && (
+        isTeamCaptain(resource.data.fromTeamId) || 
+        isTeamCaptain(resource.data.toTeamId)
+      );
+    }
+
+    // --- Team Join Requests ---
+    match /teamJoinRequests/{requestId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (
+        request.auth.uid == resource.data.userId || 
+        isTeamCaptain(resource.data.teamId)
+      );
+    }
+
+    // --- Notifications ---
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.toUserId == request.auth.uid;
+      allow create: if isAuthenticated(); // Systems/Users can send notifications
+      allow update: if isAuthenticated() && resource.data.toUserId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.toUserId == request.auth.uid;
+    }
+
+    // --- Direct Chats ---
+    match /directChats/{chatId} {
+      allow read: if isAuthenticated() && request.auth.uid in chatId.split('_');
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated() && request.auth.uid in chatId.split('_');
+      }
+    }
+
+    // --- Captain Chats ---
+    match /captainChats/{challengeId} {
+      allow read: if isAuthenticated(); 
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated(); 
+      }
+    }
+
+    // --- Team Chats ---
+    match /teamChats/{teamId} {
+      allow read: if isAuthenticated(); // Simplified, should check if user is in team
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated(); 
+      }
+    }
+
+    // --- Default Deny ---
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

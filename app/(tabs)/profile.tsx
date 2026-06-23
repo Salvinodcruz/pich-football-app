@@ -1,16 +1,19 @@
-import React, { useState, useEffect, useRef , useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, Switch, Alert, ActivityIndicator,
   TextInput, Image, Modal, Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter , useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { signOut } from 'firebase/auth';
-import { auth, db } from '@/src/config/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, db, storage } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import { updatePlayerRating } from '@/src/utils/ratingService';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import SkillHexagon from '@/src/components/SkillHexagon';
@@ -30,6 +33,14 @@ export default function ProfileScreen() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPlayerInfo, setShowPlayerInfo] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: showDropdown ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [showDropdown]);
 
   const [editFirstName, setEditFirstName] = useState('');
   const [editMiddleName, setEditMiddleName] = useState('');
@@ -102,16 +113,24 @@ export default function ProfileScreen() {
       if (status !== 'granted') { Alert.alert('Permission needed', 'Please allow access to your photo library'); return; }
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true, aspect: [1, 1], quality: 0.3, base64: true,
+        allowsEditing: true, aspect: [1, 1], quality: 0.3,
       });
-      if (result.canceled || !result.assets[0].base64) return;
+      if (result.canceled || !result.assets[0].uri) return;
       setUploadingPhoto(true);
       const user = auth.currentUser;
       if (!user) return;
-      await updateDoc(doc(db, 'users', user.uid), { photoURL: `data:image/jpeg;base64,${result.assets[0].base64}` });
-      await loadProfile();
+
+      // Upload to Firebase Storage
+      const response = await fetch(result.assets[0].uri);
+      const blob = await response.blob();
+      const storageRef = ref(storage, `profile_photos/${user.uid}`);
+      await uploadBytes(storageRef, blob);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      await updateDoc(doc(db, 'users', user.uid), { photoURL: downloadURL });
       Alert.alert('Photo Updated!');
     } catch (e) {
+      console.error(e);
       Alert.alert('Error', 'Could not upload photo');
     } finally {
       setUploadingPhoto(false);
@@ -154,34 +173,11 @@ export default function ProfileScreen() {
     } catch (e) { Alert.alert('Error', 'Could not update free agent status'); }
   };
 
-  useEffect(() => {
-    if (showDropdown) {
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 150,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [showDropdown]);
-
   const handleSignOut = async () => {
     setShowDropdown(false);
     Alert.alert('Sign Out', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: async () => { 
-        try {
-          await signOut(auth); 
-          router.replace('/login'); 
-        } catch (e) {
-          Alert.alert('Error', 'Could not sign out');
-        }
-      } }
+      { text: 'Sign Out', style: 'destructive', onPress: async () => { await signOut(auth); router.replace('/login'); } }
     ]);
   };
 
@@ -207,48 +203,6 @@ export default function ProfileScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: '#050505' }}>
       <PremiumBackground />
-      
-      {/* Dropdown Overlay - placed here to be behind dropdown but above content */}
-      {showDropdown && (
-        <TouchableOpacity 
-          style={styles.dropdownOverlay} 
-          onPress={() => setShowDropdown(false)} 
-          activeOpacity={1} 
-        />
-      )}
-
-      {/* Dropdown Menu - placed outside ScrollView for stable absolute positioning */}
-      {showDropdown && (
-        <Animated.View style={[styles.dropdown, { opacity: fadeAnim, transform: [{ translateY: fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) }] }]}>
-          <TouchableOpacity style={styles.dropdownItem} onPress={() => { setShowDropdown(false); setShowEditModal(true); }}>
-            <Ionicons name="pencil-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
-            <Text style={styles.dropdownText}>Edit Profile</Text>
-          </TouchableOpacity>
-          <View style={styles.dropdownDivider} />
-          <TouchableOpacity style={styles.dropdownItem} onPress={() => { setShowDropdown(false); setShowPlayerInfo(true); }}>
-            <Ionicons name="id-card-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
-            <Text style={styles.dropdownText}>Player Info</Text>
-          </TouchableOpacity>
-          <View style={styles.dropdownDivider} />
-          <View style={styles.dropdownItemRow}>
-            <Ionicons name="walk-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
-            <Text style={styles.dropdownText}>Free Agent</Text>
-            <Switch
-              value={isFreeAgent}
-              onValueChange={toggleFreeAgent}
-              trackColor={{ false: Colors.dark.border, true: Colors.dark.tint }}
-              thumbColor={isFreeAgent ? '#000' : '#888'}
-              style={{ marginLeft: 'auto', transform: [{ scale: 0.8 }] }}
-            />
-          </View>
-          <View style={styles.dropdownDivider} />
-          <TouchableOpacity style={styles.dropdownItem} onPress={handleSignOut}>
-            <Ionicons name="log-out-outline" size={18} color="#FF4444" style={styles.dropdownIcon} />
-            <Text style={[styles.dropdownText, { color: '#FF4444' }]}>Sign Out</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
-
       <ScrollView
         style={styles.container}
         contentContainerStyle={[styles.content, {
@@ -258,9 +212,9 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Header Glass Row ── */}
-        <View style={styles.headerGlass}>
+        <View style={styles.headerGlass} pointerEvents="box-none">
           <Text style={styles.pageTitle}>Profile</Text>
-          <View style={styles.headerIcons}>
+          <View style={styles.headerIcons} pointerEvents="box-none">
             <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/friends')}>
               <Ionicons name="people-outline" size={20} color="#FFF" />
             </TouchableOpacity>
@@ -282,37 +236,27 @@ export default function ProfileScreen() {
 
         {/* ── Hero Section ── */}
         <View style={styles.heroSection}>
-          <View style={styles.avatarWrapper}>
-            <TouchableOpacity onPress={handlePhotoUpload} disabled={uploadingPhoto}>
-              <View style={[styles.avatarGlow, { borderColor: posColor, shadowColor: posColor }]}>
-                {profile?.photoURL ? (
-                  <Image source={{ uri: profile.photoURL }} style={styles.avatarImage} />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Text style={[styles.avatarInitials, { color: posColor }]}>{initials.toUpperCase()}</Text>
-                  </View>
-                )}
-                {profile?.position && (
-                  <View style={[styles.posBadgeOnAvatar, { backgroundColor: posColor }]}>
-                    <Text style={styles.posBadgeText}>{profile.position}</Text>
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.miniEditBtn} 
-              onPress={() => setShowEditModal(true)}
-            >
-              <Ionicons name="pencil" size={12} color="#000" />
-            </TouchableOpacity>
-
+          <TouchableOpacity style={styles.avatarWrapper} onPress={handlePhotoUpload} disabled={uploadingPhoto}>
+            <View style={[styles.avatarGlow, { borderColor: posColor, shadowColor: posColor }]}>
+              {profile?.photoURL ? (
+                <Image source={{ uri: profile.photoURL }} style={styles.avatarImage} />
+              ) : (
+                <View style={styles.avatarPlaceholder}>
+                  <Text style={[styles.avatarInitials, { color: posColor }]}>{initials.toUpperCase()}</Text>
+                </View>
+              )}
+              {profile?.position && (
+                <View style={[styles.posBadgeOnAvatar, { backgroundColor: posColor }]}>
+                  <Text style={styles.posBadgeText}>{profile.position}</Text>
+                </View>
+              )}
+            </View>
             {uploadingPhoto && (
               <View style={styles.uploadingOverlay}>
                 <ActivityIndicator size="small" color={Colors.dark.tint} />
               </View>
             )}
-          </View>
+          </TouchableOpacity>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <Text style={styles.heroName}>{displayName}</Text>
@@ -379,6 +323,46 @@ export default function ProfileScreen() {
               ))}
             </>
           )}
+        </View>
+
+        {/* ── Quick Actions ── */}
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <View style={styles.quickActionsRow}>
+          <TouchableOpacity
+            style={styles.quickActionCard}
+            activeOpacity={0.75}
+            onPress={() => router.push('/ai-highlights' as any)}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: Colors.dark.tint + '18' }]}>
+              <Ionicons name="videocam-outline" size={22} color={Colors.dark.tint} />
+            </View>
+            <Text style={styles.quickActionTitle}>AI Highlights</Text>
+            <Text style={styles.quickActionSub}>Highlights & Reels</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionCard}
+            activeOpacity={0.75}
+            onPress={() => router.push('/pitches' as any)}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: '#4FC3F718' }]}>
+              <Ionicons name="location-outline" size={22} color="#4FC3F7" />
+            </View>
+            <Text style={styles.quickActionTitle}>Find Pitches</Text>
+            <Text style={styles.quickActionSub}>Book a Ground</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickActionCard}
+            activeOpacity={0.75}
+            onPress={() => router.push('/friends')}
+          >
+            <View style={[styles.quickActionIcon, { backgroundColor: '#FF6B6B18' }]}>
+              <Ionicons name="people-outline" size={22} color="#FF6B6B" />
+            </View>
+            <Text style={styles.quickActionTitle}>Friends</Text>
+            <Text style={styles.quickActionSub}>Players you know</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Admin */}
@@ -486,6 +470,53 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Dropdown - Root Level Detached Layer */}
+      {showDropdown && (
+        <>
+          <TouchableOpacity 
+            style={styles.dropdownOverlay} 
+            onPress={() => setShowDropdown(false)} 
+            activeOpacity={1} 
+          />
+          <Animated.View style={[styles.dropdown, { opacity: fadeAnim }]}>
+            <TouchableOpacity style={styles.dropdownItem} onPress={() => { setShowDropdown(false); setShowEditModal(true); }}>
+              <Ionicons name="pencil-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
+              <Text style={styles.dropdownText}>Edit Profile</Text>
+            </TouchableOpacity>
+            <View style={styles.dropdownDivider} />
+            <TouchableOpacity style={styles.dropdownItem} onPress={() => { setShowDropdown(false); setShowPlayerInfo(true); }}>
+              <Ionicons name="id-card-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
+              <Text style={styles.dropdownText}>Player Info</Text>
+            </TouchableOpacity>
+            <View style={styles.dropdownDivider} />
+            <View style={styles.dropdownItemRow}>
+              <Ionicons name="walk-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
+              <Text style={styles.dropdownText}>Free Agent</Text>
+              <Switch
+                value={isFreeAgent}
+                onValueChange={toggleFreeAgent}
+                trackColor={{ false: Colors.dark.border, true: Colors.dark.tint }}
+                thumbColor={isFreeAgent ? '#000' : '#888'}
+                style={{ marginLeft: 'auto' }}
+              />
+            </View>
+            <View style={styles.dropdownDivider} />
+            <TouchableOpacity
+              style={styles.dropdownItem}
+              onPress={() => { setShowDropdown(false); router.push('/free-agents'); }}
+            >
+              <Ionicons name="walk-outline" size={18} color="#FFF" style={styles.dropdownIcon} />
+              <Text style={styles.dropdownText}>Free Agent Board</Text>
+            </TouchableOpacity>
+            <View style={styles.dropdownDivider} />
+            <TouchableOpacity style={styles.dropdownItem} onPress={handleSignOut}>
+              <Ionicons name="log-out-outline" size={18} color="#FF4444" style={styles.dropdownIcon} />
+              <Text style={[styles.dropdownText, { color: '#FF4444' }]}>Sign Out</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </>
+      )}
     </View>
   );
 }
@@ -506,16 +537,41 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
+    overflow: 'visible',
+    zIndex: 100,
   },
   pageTitle: { fontSize: FontSizes.xxl, fontWeight: FontWeights.bold, color: '#fff' },
-  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  iconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', position: 'relative' },
-  badge: { position: 'absolute', top: -3, right: -3, backgroundColor: '#FF4444', borderRadius: 8, minWidth: 15, height: 15, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: '#050505' },
+  headerIcons: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: Spacing.sm,
+    overflow: 'visible',
+    zIndex: 100,
+  },
+  iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', position: 'relative' },
+  badge: { position: 'absolute', top: 2, right: 2, backgroundColor: '#FF4444', borderRadius: 8, minWidth: 15, height: 15, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: '#050505' },
   badgeText: { color: '#fff', fontSize: 8, fontWeight: FontWeights.bold },
 
   // Dropdown
-  dropdown: { position: 'absolute', top: 64, right: Spacing.lg, backgroundColor: '#1A1A1A', borderRadius: BorderRadius.md, borderWidth: 1, borderColor: '#2A2A2A', zIndex: 9999, minWidth: 200, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 10 },
-  dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 9998, backgroundColor: 'transparent' },
+  dropdown: { 
+    position: 'absolute', 
+    top: 95, 
+    right: 16, 
+    backgroundColor: '#1A1A1A', 
+    borderRadius: BorderRadius.md, 
+    borderWidth: 1, 
+    borderColor: '#2A2A2A', 
+    zIndex: 99999, 
+    minWidth: 200, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.4, 
+    shadowRadius: 8, 
+    elevation: 10,
+    overflow: 'visible',
+  },
+  dropdownOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 99998, backgroundColor: 'transparent' },
+
 
   dropdownItem: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, gap: Spacing.sm },
   dropdownItemRow: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, gap: Spacing.sm },
@@ -538,7 +594,6 @@ const styles = StyleSheet.create({
   avatarImage: { width: '100%', height: '100%', borderRadius: 48, overflow: 'hidden' },
   avatarPlaceholder: { width: '100%', height: '100%', backgroundColor: '#1A1A1A', borderRadius: 48, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   avatarInitials: { fontSize: FontSizes.xl, fontWeight: FontWeights.bold },
-  miniEditBtn: { position: 'absolute', top: 0, right: 0, backgroundColor: Colors.dark.tint, width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#050505' },
   posBadgeOnAvatar: { position: 'absolute', bottom: -5, right: -5, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1.5, borderColor: '#050505' },
   posBadgeText: { color: '#000', fontSize: 9, fontWeight: FontWeights.bold },
   uploadingOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 48, justifyContent: 'center', alignItems: 'center' },
@@ -584,11 +639,52 @@ const styles = StyleSheet.create({
   statVal: { color: '#fff', fontSize: FontSizes.lg, fontWeight: FontWeights.bold },
   statLbl: { color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  // Action Row
-  actionRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
-  actionGlass: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: BorderRadius.md, padding: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  actionGlassGreen: { borderColor: 'rgba(0,230,118,0.2)', backgroundColor: 'rgba(0,230,118,0.05)' },
-  actionGlassText: { color: '#aaa', fontSize: FontSizes.sm, fontWeight: FontWeights.semibold },
+  // Section title
+  sectionTitle: {
+    color: '#555',
+    fontSize: 10,
+    fontWeight: FontWeights.bold,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: Spacing.sm,
+  },
+
+  // Quick Actions
+  quickActionsRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  quickActionCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    gap: 6,
+  },
+  quickActionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  quickActionTitle: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: FontWeights.semibold,
+    textAlign: 'center',
+  },
+  quickActionSub: {
+    color: '#555',
+    fontSize: 9,
+    textAlign: 'center',
+    letterSpacing: 0.3,
+  },
 
   // Admin
   adminBtn: { backgroundColor: 'rgba(255,193,7,0.05)', borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center', marginBottom: Spacing.md, borderWidth: 1, borderColor: 'rgba(255,193,7,0.1)' },

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Image, Alert, TextInput,
+  TouchableOpacity, ActivityIndicator, Image, TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -11,6 +11,7 @@ import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constan
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { getFriends, createPickupTeam } from '@/src/utils/friendsService';
 import { Ionicons } from '@expo/vector-icons';
+import { useDialog } from '@/src/context/DialogContext';
 
 const FORMATS = ['5-a-side', '7-a-side', '11-a-side'];
 const EMIRATES = ['Sharjah', 'Dubai', 'Ajman'];
@@ -18,6 +19,7 @@ const EMIRATES = ['Sharjah', 'Dubai', 'Ajman'];
 export default function CreatePickupScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { showAlert } = useDialog();
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [friends, setFriends] = useState<any[]>([]);
@@ -55,11 +57,11 @@ export default function CreatePickupScreen() {
 
   const handleCreate = async () => {
     if (!teamName.trim()) {
-      Alert.alert('Missing Info', 'Please enter a team name');
+      showAlert('Missing Info', 'Please enter a team name');
       return;
     }
     if (selectedFriends.length === 0) {
-      Alert.alert('Select Friends', 'Select at least one friend to play with');
+      showAlert('Select Friends', 'Select at least one friend to play with');
       return;
     }
     setCreating(true);
@@ -71,14 +73,14 @@ export default function CreatePickupScreen() {
         user.uid, name, teamName.trim(),
         selectedFriends, format, emirate
       );
-      Alert.alert(
+      showAlert(
         'Pickup Team Created!',
         `${teamName} is ready!\n\nThis team auto-deletes 48hrs after creation.`,
         [{ text: 'Let\'s Go!', onPress: () => router.replace('/(tabs)/my-team') }]
       );
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Could not create pickup team');
+      showAlert('Error', 'Could not create pickup team');
     } finally {
       setCreating(false);
     }

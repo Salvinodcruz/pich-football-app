@@ -9,15 +9,28 @@ type IconMapping = Record<SymbolViewProps['name'], ComponentProps<typeof Materia
 type IconSymbolName = keyof typeof MAPPING;
 
 /**
- * Add your SF Symbols to Material Icons mappings here.
- * - see Material Icons in the [Icons Directory](https://icons.expo.fyi).
- * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
+ * SF Symbols → Material Icons mappings (used on Android & web).
+ * Add any new SF Symbol name used in the codebase here so icons
+ * render correctly on non-iOS platforms.
+ * - Icons directory: https://icons.expo.fyi
  */
 const MAPPING = {
+  // Navigation tabs
   'house.fill': 'home',
+  'magnifyingglass': 'search',
+  'trophy.fill': 'emoji-events',
+  'person.2.fill': 'group',
+  'person.fill': 'person',
+  // Common UI
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
+  'bell.fill': 'notifications',
+  'gear': 'settings',
+  'star.fill': 'star',
+  'location.fill': 'place',
+  'calendar': 'calendar-today',
+  'video.fill': 'videocam',
 } as IconMapping;
 
 /**

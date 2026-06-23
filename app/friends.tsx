@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Image,
-  TextInput, Alert,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -13,6 +13,7 @@ import {
 import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import PremiumBackground from '@/src/components/PremiumBackground';
+import CustomDialog from '@/src/components/CustomDialog';
 import {
   getFriends, sendFriendRequest, acceptFriendRequest,
   getPendingRequests, removeFriend,
@@ -32,7 +33,21 @@ export default function FriendsScreen() {
   const [tab, setTab] = useState<'friends' | 'requests'>('friends');
   const [myProfile, setMyProfile] = useState<any>(null);
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+  const [dialog, setDialog] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    buttons: [] as any[],
+  });
+
+  const showCustomAlert = (title: string, message: string, buttons?: any[]) => {
+    setDialog({
+      visible: true,
+      title,
+      message,
+      buttons: buttons || [{ text: 'OK', onPress: () => setDialog(prev => ({ ...prev, visible: false })) }],
+    });
+  };
 
   useEffect(() => {
     if (pending.length === 0) { setPendingWithProfiles([]); return; }
@@ -78,17 +93,17 @@ export default function FriendsScreen() {
       const q = query(collection(db, 'users'), where('playerId', '==', search.trim().toUpperCase()));
       const snap = await getDocs(q);
       if (snap.empty) {
-        Alert.alert('Not Found', 'No player with that ID');
+        showCustomAlert('Not Found', 'No player with that ID');
       } else {
         const data = { id: snap.docs[0].id, ...snap.docs[0].data() };
         if ((data as any).id === auth.currentUser?.uid) {
-          Alert.alert('Oops', "That's your own ID!");
+          showCustomAlert('Oops', "That's your own ID!");
         } else {
           setSearchResult(data);
         }
       }
     } catch (e) {
-      Alert.alert('Error', 'Search failed');
+      showCustomAlert('Error', 'Search failed');
     } finally {
       setSearching(false);
     }
@@ -103,11 +118,11 @@ export default function FriendsScreen() {
         myProfile.photoURL || null,
         searchResult.id,
       );
-      Alert.alert('Request Sent!', `Friend request sent to ${searchResult.firstName || searchResult.name}`);
+      showCustomAlert('Request Sent!', `Friend request sent to ${searchResult.firstName || searchResult.name}`);
       setSearchResult(null);
       setSearch('');
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Could not send request');
+      showCustomAlert('Error', e.message || 'Could not send request');
     }
   };
 
@@ -121,19 +136,20 @@ export default function FriendsScreen() {
       );
       load();
     } catch (e) {
-      Alert.alert('Error', 'Could not accept request');
+      showCustomAlert('Error', 'Could not accept request');
     }
   };
 
   const handleRemoveFriend = (friend: any) => {
-    Alert.alert(
+    showCustomAlert(
       'Remove Friend',
       `Remove ${friend.firstName || friend.name} from friends?`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => setDialog(prev => ({ ...prev, visible: false })) },
         {
           text: 'Remove', style: 'destructive',
           onPress: async () => {
+            setDialog(prev => ({ ...prev, visible: false }));
             await removeFriend(friend.friendshipId);
             load();
           }
@@ -328,6 +344,14 @@ export default function FriendsScreen() {
           )
         )}
       </ScrollView>
+
+      <CustomDialog
+        visible={dialog.visible}
+        title={dialog.title}
+        message={dialog.message}
+        buttons={dialog.buttons}
+        onClose={() => setDialog(prev => ({ ...prev, visible: false }))}
+      />
     </View>
   );
 }

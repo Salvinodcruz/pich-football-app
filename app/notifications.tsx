@@ -13,10 +13,12 @@ import { auth, db } from '@/src/config/firebase';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons } from '@expo/vector-icons';
+import { useDialog } from '@/src/context/DialogContext';
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { showAlert } = useDialog();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -80,10 +82,10 @@ export default function NotificationsScreen() {
       });
       batch.delete(doc(db, 'notifications', n.id));
       await batch.commit();
-      Alert.alert('Success! ✅', `You've joined ${n.fromTeamName}`);
+      showAlert('Success! ✅', `You've joined ${n.fromTeamName}`);
       load();
     } catch (e) { 
-      Alert.alert('Error', 'Could not join team'); 
+      showAlert('Error', 'Could not join team'); 
     } finally { 
       setResponding(null); 
     }

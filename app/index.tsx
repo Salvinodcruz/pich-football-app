@@ -28,15 +28,12 @@ export default function OnboardingScreen() {
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
             router.replace('/(tabs)');
-          } else {
-            // If no profile, they might have quit during signup
-            // We only redirect to signup if we are still on the onboarding screen
-            // and the user is actually signed in.
-            // Using a slight delay to ensure other navigation finishes
-            setTimeout(() => {
-              if (isMounted) router.replace('/signup');
-            }, 500);
           }
+          // We do NOT redirect to /signup here because it interferes 
+          // with the signup/profile-setup flow. 
+          // If the user has no profile, they can choose to login or signup manually
+          // from the onboarding screen, or the app will naturally 
+          // stay here if they just logged out.
         } catch (error) {
           console.error('Error checking user profile:', error);
         }

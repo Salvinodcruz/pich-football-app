@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator,
+  StyleSheet, ActivityIndicator,
   ScrollView, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -12,10 +12,12 @@ import { doc, getDoc } from 'firebase/firestore';
 import { Colors, Spacing, BorderRadius, FontSizes, FontWeights } from '@/constants/theme';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons } from '@expo/vector-icons';
+import { useDialog } from '@/src/context/DialogContext';
 
 export default function SignupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { showAlert } = useDialog();
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -38,19 +40,19 @@ export default function SignupScreen() {
 
   const handleSignup = async () => {
     if (!firstName.trim() || !lastName.trim()) {
-      Alert.alert('Error', 'Please enter your first and last name');
+      showAlert('Error', 'Please enter your first and last name');
       return;
     }
     if (!email || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
+      showAlert('Error', 'Please fill in all fields');
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      showAlert('Error', 'Passwords do not match');
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      showAlert('Error', 'Password must be at least 6 characters');
       return;
     }
 
@@ -58,28 +60,8 @@ export default function SignupScreen() {
     try {
       let user;
       
-      // If already signed in with the same email, use that user
-      if (auth.currentUser && auth.currentUser.email === email.trim().toLowerCase()) {
-        user = auth.currentUser;
-      } else {
-        try {
-          const userCredential = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
-          user = userCredential.user;
-        } catch (signupError: any) {
-          // If email is already in use, try to sign in with the provided password
-          if (signupError.code === 'auth/email-already-in-use') {
-            try {
-              const signInCredential = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
-              user = signInCredential.user;
-            } catch (signInError) {
-              // If sign in also fails, it's probably a wrong password or other issue
-              throw signupError; // Throw the original signup error
-            }
-          } else {
-            throw signupError;
-          }
-        }
-      }
+      const userCredential = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+      user = userCredential.user;
 
       if (user) {
         router.push({
@@ -99,7 +81,7 @@ export default function SignupScreen() {
       else if (error.code === 'auth/invalid-email') message = 'Invalid email address';
       else if (error.code === 'auth/weak-password') message = 'Password is too weak';
       else if (error.code === 'auth/network-request-failed') message = 'Network error. Please check your connection.';
-      Alert.alert('Signup Error', message);
+      showAlert('Signup Error', message);
     } finally {
       setLoading(false);
     }

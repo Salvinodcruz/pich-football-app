@@ -50,9 +50,18 @@ const normalizeRating = (rawScore: number): number => {
   return Math.max(1, Math.min(100, normalized));
 };
 
-// Calculate rating for ALL players and update Firestore
-export const recalculateAllRatings = async (): Promise<void> => {
+// Calculate rating for players and update Firestore
+export const recalculateAllRatings = async (userIds?: string[]): Promise<void> => {
   try {
+    if (userIds && userIds.length > 0) {
+      // Targeted update for specific users
+      for (const uid of userIds) {
+        await updatePlayerRating(uid);
+      }
+      return;
+    }
+
+    // Full update (legacy, use with caution)
     const snap = await getDocs(collection(db, 'users'));
     if (snap.empty) return;
 
@@ -65,8 +74,6 @@ export const recalculateAllRatings = async (): Promise<void> => {
         await updateDoc(doc(db, 'users', d.id), { skillRating: rating });
       }
     }
-
-    console.log('Ratings recalculated for', snap.docs.length, 'players');
   } catch (e) {
     console.error('Rating calculation error:', e);
   }
@@ -85,8 +92,6 @@ export const updatePlayerRating = async (userId: string): Promise<void> => {
     if (player.skillRating !== rating) {
       await updateDoc(doc(db, 'users', userId), { skillRating: rating });
     }
-
-    console.log(`Player ${userId} rating updated to ${rating}`);
   } catch (e) {
     console.error('Single player rating error:', e);
   }

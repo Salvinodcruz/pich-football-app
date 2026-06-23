@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Alert, ActivityIndicator, Modal, TextInput,
+  TouchableOpacity, ActivityIndicator, Modal, TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -10,6 +10,7 @@ import { auth, db } from '@/src/config/firebase';
 import { sendChallenge } from '@/src/utils/challengeService';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import PremiumBackground from '@/src/components/PremiumBackground';
+import CustomDialog from '@/src/components/CustomDialog';
 import { Ionicons } from '@expo/vector-icons';
 
 const FORMATS = ['5-a-side', '7-a-side', '11-a-side'];
@@ -79,6 +80,22 @@ export default function SendChallengeScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
 
+  const [dialog, setDialog] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    buttons: [] as any[],
+  });
+
+  const showCustomAlert = (title: string, message: string, buttons?: any[]) => {
+    setDialog({
+      visible: true,
+      title,
+      message,
+      buttons: buttons || [{ text: 'OK', onPress: () => setDialog(prev => ({ ...prev, visible: false })) }],
+    });
+  };
+
   const nowDate = new Date();
   const currentDay = String(nowDate.getDate()).padStart(2, '0');
   const currentMonth = MONTHS[nowDate.getMonth()];
@@ -102,7 +119,7 @@ export default function SendChallengeScreen() {
   const timeString = `${hour}:${minute} ${period}`;
 
   const handleSend = async () => {
-    if (!venue) { Alert.alert('Missing Info', 'Please select a venue'); return; }
+    if (!venue) { showCustomAlert('Missing Info', 'Please select a venue'); return; }
     setLoading(true);
     try {
       const user = auth.currentUser;
@@ -110,11 +127,21 @@ export default function SendChallengeScreen() {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const userData = userDoc.data();
       if (!userData?.teamId) {
-        Alert.alert('No Team', 'You need to be in a team to send challenges');
+        showCustomAlert('No Team', 'You need to be in a team to send challenges');
         return;
       }
       const teamDoc = await getDoc(doc(db, 'teams', userData.teamId));
       const teamData = teamDoc.data();
+
+      // Calculate ISO Date for robustness
+      const isoDate = new Date(
+        parseInt(year),
+        MONTHS.indexOf(month),
+        parseInt(day),
+        period === 'PM' && hour !== '12' ? parseInt(hour) + 12 : (period === 'AM' && hour === '12' ? 0 : parseInt(hour)),
+        parseInt(minute)
+      ).toISOString();
+
       await sendChallenge({
         fromTeamId: userData.teamId,
         fromTeamName: teamData?.name || 'Unknown',
@@ -126,14 +153,15 @@ export default function SendChallengeScreen() {
         matchType,
         date: dateString,
         time: timeString,
+        isoDate,
         venue,
         message: '',
       });
-      Alert.alert('Challenge Sent!', `Your challenge has been sent to ${toTeamName}.`, [
-        { text: 'OK', onPress: () => router.back() }
+      showCustomAlert('Challenge Sent!', `Your challenge has been sent to ${toTeamName}.`, [
+        { text: 'OK', onPress: () => { setDialog(prev => ({ ...prev, visible: false })); router.back(); } }
       ]);
     } catch (e) {
-      Alert.alert('Error', 'Could not send challenge. Please try again.');
+      showCustomAlert('Error', 'Could not send challenge. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -366,6 +394,14 @@ export default function SendChallengeScreen() {
         </View>
       </Modal>
     </ScrollView>
+
+    <CustomDialog
+      visible={dialog.visible}
+      title={dialog.title}
+      message={dialog.message}
+      buttons={dialog.buttons}
+      onClose={() => setDialog(prev => ({ ...prev, visible: false }))}
+    />
     </View>
   );
 }

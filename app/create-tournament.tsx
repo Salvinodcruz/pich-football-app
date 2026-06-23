@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, TextInput, Alert, ActivityIndicator, Modal,
+  TouchableOpacity, TextInput, ActivityIndicator, Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -11,6 +11,7 @@ import { createTournament } from '@/src/utils/tournamentService';
 import { Colors, Spacing, FontSizes, FontWeights, BorderRadius } from '@/constants/theme';
 import PremiumBackground from '@/src/components/PremiumBackground';
 import { Ionicons } from '@expo/vector-icons';
+import { useDialog } from '@/src/context/DialogContext';
 
 const FORMATS = ['5-a-side', '7-a-side', '11-a-side'];
 const EMIRATES = ['Sharjah', 'Dubai', 'Ajman'];
@@ -45,6 +46,7 @@ const YEARS = [String(now.getFullYear()), String(now.getFullYear() + 1)];
 export default function CreateTournamentScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { showAlert } = useDialog();
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState('');
   const [format, setFormat] = useState('7-a-side');
@@ -67,15 +69,15 @@ export default function CreateTournamentScreen() {
   const finalVenue = showCustomVenue ? customVenue : venue;
 
   const handleCreate = async () => {
-    if (!name.trim()) { Alert.alert('Missing Info', 'Please enter a tournament name'); return; }
-    if (!finalVenue.trim()) { Alert.alert('Missing Info', 'Please select or enter a venue'); return; }
+    if (!name.trim()) { showAlert('Missing Info', 'Please enter a tournament name'); return; }
+    if (!finalVenue.trim()) { showAlert('Missing Info', 'Please select or enter a venue'); return; }
     setLoading(true);
     try {
       const user = auth.currentUser;
       if (!user) return;
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const teamId = userDoc.data()?.teamId;
-      if (!teamId) { Alert.alert('No Team', 'You need a team to create a tournament'); return; }
+      if (!teamId) { showAlert('No Team', 'You need a team to create a tournament'); return; }
       await createTournament({
         name: name.trim(),
         format,
@@ -85,11 +87,11 @@ export default function CreateTournamentScreen() {
         venue: finalVenue.trim(),
         entryFee: parseInt(entryFee) || 0,
       }, user.uid, teamId);
-      Alert.alert('Tournament Created!', `${name} is now live!`, [
+      showAlert('Tournament Created!', `${name} is now live!`, [
         { text: 'OK', onPress: () => router.replace('/(tabs)/tournaments') }
       ]);
     } catch (e) {
-      Alert.alert('Error', 'Could not create tournament');
+      showAlert('Error', 'Could not create tournament');
     } finally {
       setLoading(false);
     }
@@ -399,5 +401,5 @@ const styles = StyleSheet.create({
   pickerItemText: { color: Colors.dark.textSecondary, fontSize: FontSizes.md },
   pickerItemTextActive: { color: Colors.dark.tint, fontWeight: FontWeights.bold },
   pickerPreview: { marginTop: Spacing.lg, backgroundColor: '#111', borderRadius: BorderRadius.md, padding: Spacing.md, alignItems: 'center' },
-  pickerPreviewText: { color: '#fff', fontSize: FontSizes.md, fontWeight: FontWeights.semibold },
+  pickerPreviewText: { color: '#fff', fontSize: FontSizes.md, fontWeight: FontWeights.bold },
 });
